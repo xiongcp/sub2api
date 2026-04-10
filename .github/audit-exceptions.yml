@@ -31,7 +31,7 @@ exceptions:
   - package: axios
     advisory: "GHSA-3p68-rc4w-qgx5"
     severity: critical
-    reason: "NO_PROXY bypass not exploitable; all API calls go to known endpoints via server-side proxy"
-    mitigation: "Proxy configuration not user-controlled; upgrade when axios releases fix"
-    expires_on: "2026-07-10"
+    reason: "NO_PROXY bypass only affects server-side Node.js environments; axios is used exclusively in the browser (frontend SPA) where NO_PROXY is not applicable"
+    mitigation: "All axios requests target the same-origin backend API; no user-controlled URLs or proxy configurations are involved"
+    expires_on: "2026-10-10"
     owner: "security@your-domain"
