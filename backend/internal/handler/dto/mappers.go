@@ -285,6 +285,8 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 			out.QuotaLimit = &limit
 			used := a.GetQuotaUsed()
 			out.QuotaUsed = &used
+			remaining := a.GetQuotaRemaining()
+			out.QuotaRemaining = &remaining
 		}
 		if limit := a.GetQuotaDailyLimit(); limit > 0 {
 			out.QuotaDailyLimit = &limit
@@ -302,6 +304,13 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 			}
 			out.QuotaWeeklyUsed = &used
 		}
+		if threshold := a.GetQuotaMinRemaining(); threshold > 0 {
+			out.QuotaMinRemaining = &threshold
+		}
+		if thresholdRatio := a.GetQuotaMinRemainingRatio(); thresholdRatio > 0 {
+			out.QuotaMinRemainingRatio = &thresholdRatio
+		}
+		out.LowQuotaThresholdTriggered = a.IsBelowQuotaSchedulingThreshold()
 		// 固定时间重置配置
 		if mode := a.GetQuotaDailyResetMode(); mode == "fixed" {
 			out.QuotaDailyResetMode = &mode

@@ -98,6 +98,7 @@ func main() {
 
 func runSetupServer() {
 	r := gin.New()
+	r.Use(middleware.RequestBodyLimit(4 << 20))
 	r.Use(middleware.Recovery())
 	r.Use(middleware.CORS(config.CORSConfig{}))
 	r.Use(middleware.SecurityHeaders(config.CSPConfig{Enabled: true, Policy: config.DefaultCSPPolicy}, nil))

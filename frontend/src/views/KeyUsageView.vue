@@ -59,7 +59,7 @@
               :type="keyVisible ? 'text' : 'password'"
               :placeholder="t('keyUsage.placeholder')"
               class="input-ring w-full h-12 pl-12 pr-12 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 transition-all dark:border-dark-700 dark:bg-dark-900 dark:text-white dark:placeholder:text-dark-500"
-              @keydown.enter="queryKey"
+              @keydown.enter="handleQuerySubmit"
             />
             <button
               @click="keyVisible = !keyVisible"
@@ -75,7 +75,7 @@
             </button>
           </div>
           <button
-            @click="queryKey"
+            @click="handleQuerySubmit"
             :disabled="isQuerying"
             class="h-12 px-7 rounded-xl bg-primary-500 hover:bg-primary-600 text-white font-medium text-sm transition-all active:scale-[0.97] flex items-center gap-2 whitespace-nowrap disabled:opacity-60"
           >
@@ -119,7 +119,7 @@
                 class="input-ring text-xs px-2 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-900 dark:border-dark-700 dark:bg-dark-900 dark:text-white"
               />
               <button
-                @click="queryKey"
+                @click="handleQuerySubmit"
                 class="text-xs px-3 py-1.5 rounded-lg bg-primary-500 text-white hover:bg-primary-600"
               >{{ t('keyUsage.apply') }}</button>
             </div>
@@ -289,6 +289,82 @@
             </div>
           </div>
 
+          <!-- Usage Log Table -->
+          <div
+            class="fade-up fade-up-delay-4 rounded-2xl border border-gray-200 bg-white/90 backdrop-blur-sm overflow-hidden dark:border-dark-700 dark:bg-dark-900/90"
+          >
+            <div class="px-8 py-5 border-b border-gray-200 dark:border-dark-700">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.requestDetails') }}</h3>
+                <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-dark-400">
+                  <span>{{ t('keyUsage.pageInfo', { page: usageLogPage.page, pages: usageLogPage.pages, total: usageLogPage.total }) }}</span>
+                  <button
+                    @click="changeUsageLogPage(usageLogPage.page - 1)"
+                    :disabled="!canPrevUsageLogPage || isQuerying"
+                    class="rounded-lg border border-gray-200 px-3 py-1.5 text-gray-700 transition-colors hover:border-primary-300 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-700 dark:text-dark-200 dark:hover:border-dark-500 dark:hover:text-white"
+                  >
+                    {{ t('keyUsage.prevPage') }}
+                  </button>
+                  <button
+                    @click="changeUsageLogPage(usageLogPage.page + 1)"
+                    :disabled="!canNextUsageLogPage || isQuerying"
+                    class="rounded-lg border border-gray-200 px-3 py-1.5 text-gray-700 transition-colors hover:border-primary-300 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-700 dark:text-dark-200 dark:hover:border-dark-500 dark:hover:text-white"
+                  >
+                    {{ t('keyUsage.nextPage') }}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div v-if="usageLogs.length > 0" class="overflow-x-auto">
+              <table class="w-full min-w-[860px]">
+                <thead>
+                  <tr class="border-b border-gray-200 bg-gray-50 dark:border-dark-700 dark:bg-dark-950">
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.createdAt') }}</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.model') }}</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.requestType') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.totalTokens') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.cacheReadTokens') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.cacheCreationTokens') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.cost') }}</th>
+                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.duration') }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="log in usageLogs"
+                    :key="log.id"
+                    class="border-b border-gray-100 last:border-b-0 dark:border-dark-800"
+                  >
+                    <td class="px-4 py-3 align-top text-sm whitespace-nowrap text-gray-700 dark:text-dark-200">{{ formatDateTime(log.created_at) }}</td>
+                    <td class="px-4 py-3 align-top text-sm text-gray-900 dark:text-white">
+                      <div class="font-medium">{{ log.model || '-' }}</div>
+                      <div v-if="log.request_id" class="mt-1 text-xs text-gray-400 dark:text-dark-500">{{ log.request_id }}</div>
+                    </td>
+                    <td class="px-4 py-3 align-top text-sm text-gray-700 dark:text-dark-200">
+                      <div>{{ log.request_type || '-' }}</div>
+                      <div
+                        v-if="log.inbound_endpoint || log.service_tier || log.reasoning_effort"
+                        class="mt-1 space-y-1 text-xs text-gray-400 dark:text-dark-500"
+                      >
+                        <div v-if="log.inbound_endpoint">{{ t('keyUsage.endpoint') }}: {{ log.inbound_endpoint }}</div>
+                        <div v-if="log.service_tier">{{ t('keyUsage.serviceTier') }}: {{ log.service_tier }}</div>
+                        <div v-if="log.reasoning_effort">{{ t('keyUsage.reasoningEffort') }}: {{ log.reasoning_effort }}</div>
+                      </div>
+                    </td>
+                    <td class="px-4 py-3 align-top text-right text-sm tabular-nums text-gray-700 dark:text-dark-200">{{ fmtNum(log.total_tokens) }}</td>
+                    <td class="px-4 py-3 align-top text-right text-sm tabular-nums text-gray-700 dark:text-dark-200">{{ fmtNum(log.cache_read_tokens) }}</td>
+                    <td class="px-4 py-3 align-top text-right text-sm tabular-nums text-gray-700 dark:text-dark-200">{{ fmtNum(log.cache_creation_tokens) }}</td>
+                    <td class="px-4 py-3 align-top text-right text-sm tabular-nums font-medium text-gray-900 dark:text-white">{{ usd(log.actual_cost) }}</td>
+                    <td class="px-4 py-3 align-top text-right text-sm tabular-nums text-gray-700 dark:text-dark-200">{{ formatDuration(log.duration_ms) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="px-8 py-10 text-center text-sm text-gray-500 dark:text-dark-400">
+              {{ t('keyUsage.emptyLogs') }}
+            </div>
+          </div>
+
           <!-- Model Stats Table -->
           <div
             v-if="modelStats.length > 0"
@@ -363,9 +439,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { queryPublicKeyUsage } from '@/api/usage'
+import type { PublicKeyUsageLogPage, PublicKeyUsageResponse, PublicUsageLogItem } from '@/api/usage'
 import { useAppStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
+import type { ModelStat } from '@/types'
 
 const { t, locale } = useI18n()
 const appStore = useAppStore()
@@ -397,8 +476,7 @@ const isQuerying = ref(false)
 const showResults = ref(false)
 const showLoading = ref(false)
 const showDatePicker = ref(false)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const resultData = ref<any>(null)
+const resultData = ref<PublicKeyUsageResponse | null>(null)
 const now = ref(new Date())
 let resetTimer: ReturnType<typeof setInterval> | null = null
 
@@ -423,26 +501,44 @@ function setDateRange(key: DateRangeKey) {
   }
 }
 
-function getDateParams(): string {
-  const now = new Date()
-  const fmt = (d: Date) => d.toISOString().split('T')[0]
+function formatDateInput(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+function getDateParams(): { start_date?: string; end_date?: string } {
+  const current = new Date()
 
   if (currentRange.value === 'custom') {
     if (customStartDate.value && customEndDate.value) {
-      return `start_date=${customStartDate.value}&end_date=${customEndDate.value}`
+      return {
+        start_date: customStartDate.value,
+        end_date: customEndDate.value,
+      }
     }
-    return ''
+    return {}
   }
 
-  const end = fmt(now)
+  const end = formatDateInput(current)
   let start: string
   switch (currentRange.value) {
     case 'today': start = end; break
-    case '7d': start = fmt(new Date(now.getTime() - 7 * 86400000)); break
-    case '30d': start = fmt(new Date(now.getTime() - 30 * 86400000)); break
-    default: start = fmt(new Date(now.getTime() - 30 * 86400000))
+    case '7d': start = formatDateInput(addDays(current, -7)); break
+    case '30d': start = formatDateInput(addDays(current, -30)); break
+    default: start = formatDateInput(addDays(current, -30))
   }
-  return `start_date=${start}&end_date=${end}`
+  return {
+    start_date: start,
+    end_date: end,
+  }
 }
 
 // ==================== Ring Animation ====================
@@ -515,10 +611,11 @@ const statusInfo = computed(() => {
       quota_exhausted: 'Quota Exhausted',
       expired: 'Expired',
     }
+    const statusKey = data.status || ''
     return {
       label: t('keyUsage.quotaMode'),
-      statusText: statusMap[data.status] || data.status || 'Unknown',
-      isActive: isValid && data.status === 'active',
+      statusText: statusMap[statusKey] || statusKey || 'Unknown',
+      isActive: isValid && statusKey === 'active',
     }
   }
 
@@ -655,21 +752,21 @@ const detailRows = computed<DetailRow[]>(() => {
 
     if (data.subscription) {
       const sub = data.subscription
-      if (sub.daily_limit_usd > 0) {
+      if (sub.daily_limit_usd != null && sub.daily_limit_usd > 0) {
         const pct = (sub.daily_usage_usd / sub.daily_limit_usd) * 100
         rows.push({
           iconBg: 'bg-primary-500/10', iconColor: 'text-primary-500', iconSvg: ICON_DOLLAR,
           label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '日' : 'D'})`, value: `${usd(sub.daily_usage_usd)} / ${usd(sub.daily_limit_usd)}`, valueClass: getUsageColor(pct),
         })
       }
-      if (sub.weekly_limit_usd > 0) {
+      if (sub.weekly_limit_usd != null && sub.weekly_limit_usd > 0) {
         const pct = (sub.weekly_usage_usd / sub.weekly_limit_usd) * 100
         rows.push({
           iconBg: 'bg-indigo-500/10', iconColor: 'text-indigo-500', iconSvg: ICON_DOLLAR,
           label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '周' : 'W'})`, value: `${usd(sub.weekly_usage_usd)} / ${usd(sub.weekly_limit_usd)}`, valueClass: getUsageColor(pct),
         })
       }
-      if (sub.monthly_limit_usd > 0) {
+      if (sub.monthly_limit_usd != null && sub.monthly_limit_usd > 0) {
         const pct = (sub.monthly_usage_usd / sub.monthly_limit_usd) * 100
         rows.push({
           iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500', iconSvg: ICON_DOLLAR,
@@ -728,8 +825,20 @@ const usageStatCells = computed<StatCell[]>(() => {
   ]
 })
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const modelStats = computed<any[]>(() => resultData.value?.model_stats || [])
+const modelStats = computed<ModelStat[]>(() => resultData.value?.model_stats || [])
+
+const emptyUsageLogPage: PublicKeyUsageLogPage = {
+  items: [],
+  total: 0,
+  page: 1,
+  page_size: 20,
+  pages: 1,
+}
+
+const usageLogPage = computed<PublicKeyUsageLogPage>(() => resultData.value?.usage_logs || emptyUsageLogPage)
+const usageLogs = computed<PublicUsageLogItem[]>(() => usageLogPage.value.items || [])
+const canPrevUsageLogPage = computed(() => usageLogPage.value.page > 1)
+const canNextUsageLogPage = computed(() => usageLogPage.value.page < usageLogPage.value.pages)
 
 // ==================== Utility Functions ====================
 
@@ -750,23 +859,63 @@ function formatDate(iso: string | null | undefined): string {
   return d.toLocaleDateString(loc, { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
-// ==================== API Query ====================
-
-async function fetchUsage(key: string) {
-  const dateParams = getDateParams()
-  const url = '/v1/usage' + (dateParams ? '?' + dateParams : '')
-  const res = await fetch(url, {
-    headers: { 'Authorization': 'Bearer ' + key },
+function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  const loc = locale.value === 'zh' ? 'zh-CN' : 'en-US'
+  return d.toLocaleString(loc, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
   })
-  if (!res.ok) {
-    const body = await res.json().catch(() => null)
-    const msg = body?.error?.message || body?.message || `${t('keyUsage.queryFailed')} (${res.status})`
-    throw new Error(msg)
-  }
-  return await res.json()
 }
 
-async function queryKey() {
+function formatDuration(durationMs: number | null | undefined): string {
+  if (durationMs == null || durationMs < 0) return '-'
+  if (durationMs < 1000) return `${durationMs} ms`
+  return `${(durationMs / 1000).toFixed(2)} s`
+}
+
+function getUserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone
+  } catch {
+    return 'UTC'
+  }
+}
+
+// ==================== API Query ====================
+
+async function fetchUsage(key: string, page: number): Promise<PublicKeyUsageResponse> {
+  const dateParams = getDateParams()
+  return await queryPublicKeyUsage({
+    api_key: key,
+    page,
+    page_size: emptyUsageLogPage.page_size,
+    timezone: getUserTimezone(),
+    ...dateParams,
+  })
+}
+
+function getQueryErrorMessage(error: unknown): string {
+  if (typeof error === 'object' && error !== null) {
+    const maybeError = error as { status?: number; message?: string }
+    if (maybeError.status === 429) {
+      return t('keyUsage.rateLimited')
+    }
+    if (maybeError.message) {
+      return maybeError.message
+    }
+  }
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  return t('keyUsage.queryFailedRetry')
+}
+
+async function queryKey(page: number = 1, preserveResults: boolean = false, notifySuccess: boolean = true) {
   if (isQuerying.value) return
   const key = apiKey.value.trim()
   if (!key) {
@@ -774,13 +923,16 @@ async function queryKey() {
     return
   }
 
+  const hadResults = !!resultData.value
   isQuerying.value = true
   showResults.value = true
-  showLoading.value = true
-  resultData.value = null
+  showLoading.value = !preserveResults
+  if (!preserveResults) {
+    resultData.value = null
+  }
 
   try {
-    const data = await fetchUsage(key)
+    const data = await fetchUsage(key, page)
     resultData.value = data
     showLoading.value = false
     showDatePicker.value = true
@@ -790,14 +942,29 @@ async function queryKey() {
       triggerRingAnimation(ringItems.value)
     })
 
-    appStore.showSuccess(t('keyUsage.querySuccess'))
+    if (notifySuccess) {
+      appStore.showSuccess(t('keyUsage.querySuccess'))
+    }
   } catch (err) {
-    showResults.value = false
     showLoading.value = false
-    appStore.showError((err as Error).message || t('keyUsage.queryFailedRetry'))
+    if (!hadResults) {
+      showResults.value = false
+    }
+    appStore.showError(getQueryErrorMessage(err))
   } finally {
     isQuerying.value = false
   }
+}
+
+function handleQuerySubmit() {
+  queryKey()
+}
+
+function changeUsageLogPage(page: number) {
+  if (page < 1 || page > usageLogPage.value.pages || page === usageLogPage.value.page) {
+    return
+  }
+  queryKey(page, true, false)
 }
 
 // ==================== Lifecycle ====================

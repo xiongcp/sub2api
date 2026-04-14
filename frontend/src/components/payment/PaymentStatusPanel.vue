@@ -152,8 +152,11 @@ const paidOrder = ref<PaymentOrder | null>(null)
 // Terminal outcome: null = still active, 'success' | 'cancelled' | 'expired'
 const outcome = ref<'success' | 'cancelled' | 'expired' | null>(null)
 
-let pollTimer: ReturnType<typeof setInterval> | null = null
+const POLL_INTERVALS_MS = [3000, 5000, 8000, 15000] as const
+
+let pollTimer: ReturnType<typeof setTimeout> | null = null
 let countdownTimer: ReturnType<typeof setInterval> | null = null
+let pollAttempt = 0
 
 const isAlipay = computed(() => props.paymentType.includes('alipay'))
 const isWxpay = computed(() => props.paymentType.includes('wxpay'))
@@ -221,6 +224,19 @@ async function pollStatus() {
   }
 }
 
+function scheduleNextPoll() {
+  if (!props.orderId || outcome.value) return
+  const delay = POLL_INTERVALS_MS[Math.min(pollAttempt, POLL_INTERVALS_MS.length - 1)]
+  pollTimer = setTimeout(async () => {
+    pollTimer = null
+    await pollStatus()
+    if (!outcome.value) {
+      pollAttempt += 1
+      scheduleNextPoll()
+    }
+  }, delay)
+}
+
 function startCountdown(seconds: number) {
   remainingSeconds.value = Math.max(0, seconds)
   if (remainingSeconds.value <= 0) { outcome.value = 'expired'; return }
@@ -247,8 +263,9 @@ async function handleCancel() {
 function handleDone() { cleanup(); emit('done') }
 
 function cleanup() {
-  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null }
   if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
+  pollAttempt = 0
 }
 
 // Initialize on mount
@@ -258,7 +275,8 @@ if (props.expiresAt) {
   seconds = Math.floor((new Date(props.expiresAt).getTime() - Date.now()) / 1000)
 }
 startCountdown(seconds)
-pollTimer = setInterval(pollStatus, 3000)
+pollAttempt = 0
+scheduleNextPoll()
 renderQR()
 
 watch(() => qrUrl.value, () => renderQR())

@@ -208,12 +208,16 @@ type Account struct {
 	CustomBaseURL        *string `json:"custom_base_url,omitempty"`
 
 	// API Key 账号配额限制
-	QuotaLimit       *float64 `json:"quota_limit,omitempty"`
-	QuotaUsed        *float64 `json:"quota_used,omitempty"`
-	QuotaDailyLimit  *float64 `json:"quota_daily_limit,omitempty"`
-	QuotaDailyUsed   *float64 `json:"quota_daily_used,omitempty"`
-	QuotaWeeklyLimit *float64 `json:"quota_weekly_limit,omitempty"`
-	QuotaWeeklyUsed  *float64 `json:"quota_weekly_used,omitempty"`
+	QuotaLimit                 *float64 `json:"quota_limit,omitempty"`
+	QuotaUsed                  *float64 `json:"quota_used,omitempty"`
+	QuotaRemaining             *float64 `json:"quota_remaining,omitempty"`
+	QuotaDailyLimit            *float64 `json:"quota_daily_limit,omitempty"`
+	QuotaDailyUsed             *float64 `json:"quota_daily_used,omitempty"`
+	QuotaWeeklyLimit           *float64 `json:"quota_weekly_limit,omitempty"`
+	QuotaWeeklyUsed            *float64 `json:"quota_weekly_used,omitempty"`
+	QuotaMinRemaining          *float64 `json:"quota_min_remaining,omitempty"`
+	QuotaMinRemainingRatio     *float64 `json:"quota_min_remaining_ratio,omitempty"`
+	LowQuotaThresholdTriggered bool     `json:"low_quota_threshold_triggered,omitempty"`
 
 	// 配额固定时间重置配置
 	QuotaDailyResetMode  *string `json:"quota_daily_reset_mode,omitempty"`

@@ -83,7 +83,21 @@ func RegisterAuthRoutes(
 	// 公开设置（无需认证）
 	settings := v1.Group("/settings")
 	{
-		settings.GET("/public", h.Setting.GetPublicSettings)
+		settings.GET("/public",
+			rateLimiter.LimitWithKeyOptions("settings-public", 120, time.Minute, clientIPRateLimitKey, middleware.RateLimitOptions{}),
+			h.Setting.GetPublicSettings,
+		)
+	}
+
+	// 公开 API Key 用量查询（无需登录，供 /key-usage 页面使用）
+	public := v1.Group("/public")
+	{
+		public.POST("/key-usage/query",
+			rateLimiter.LimitWithKeyOptions("public-key-usage-query", 20, time.Minute, clientIPAndHashedJSONFieldRateLimitKey("api_key"), middleware.RateLimitOptions{
+				FailureMode: middleware.RateLimitFailClose,
+			}),
+			h.Gateway.PublicKeyUsageQuery,
+		)
 	}
 
 	// 需要认证的当前用户信息

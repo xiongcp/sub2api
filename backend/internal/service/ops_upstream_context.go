@@ -79,6 +79,8 @@ func setOpsUpstreamError(c *gin.Context, upstreamStatusCode int, upstreamMessage
 // It is stored in ops_error_logs.upstream_errors as a JSON array.
 type OpsUpstreamErrorEvent struct {
 	AtUnixMs int64 `json:"at_unix_ms,omitempty"`
+	// AttemptCount aggregates repeated retry attempts of the same stage within a single request.
+	AttemptCount int `json:"attempt_count,omitempty"`
 
 	// Passthrough 表示本次请求是否命中“原样透传（仅替换认证）”分支。
 	// 该字段用于排障与灰度评估；存入 JSON，不涉及 DB schema 变更。
@@ -126,6 +128,9 @@ func appendOpsUpstreamError(c *gin.Context, ev OpsUpstreamErrorEvent) {
 	ev.UpstreamURL = strings.TrimSpace(ev.UpstreamURL)
 	ev.Message = strings.TrimSpace(ev.Message)
 	ev.Detail = strings.TrimSpace(ev.Detail)
+	if ev.AttemptCount <= 0 {
+		ev.AttemptCount = 1
+	}
 	if ev.Message != "" {
 		ev.Message = sanitizeUpstreamErrorMessage(ev.Message)
 	}
@@ -150,11 +155,59 @@ func appendOpsUpstreamError(c *gin.Context, ev OpsUpstreamErrorEvent) {
 		}
 	}
 
+	if ev.Kind == "retry" && len(existing) > 0 {
+		last := existing[len(existing)-1]
+		if shouldAggregateOpsUpstreamRetry(last, &ev) {
+			last.AtUnixMs = ev.AtUnixMs
+			last.AttemptCount += ev.AttemptCount
+			if ev.UpstreamStatusCode > 0 {
+				last.UpstreamStatusCode = ev.UpstreamStatusCode
+			}
+			if ev.UpstreamRequestID != "" {
+				last.UpstreamRequestID = ev.UpstreamRequestID
+			}
+			if ev.UpstreamURL != "" {
+				last.UpstreamURL = ev.UpstreamURL
+			}
+			if ev.UpstreamRequestBody != "" {
+				last.UpstreamRequestBody = ev.UpstreamRequestBody
+			}
+			if ev.UpstreamResponseBody != "" {
+				last.UpstreamResponseBody = ev.UpstreamResponseBody
+			}
+			if ev.Message != "" {
+				last.Message = ev.Message
+			}
+			if ev.Detail != "" {
+				last.Detail = ev.Detail
+			}
+			if ev.AccountName != "" {
+				last.AccountName = ev.AccountName
+			}
+			last.Passthrough = last.Passthrough || ev.Passthrough
+			c.Set(OpsUpstreamErrorsKey, existing)
+			checkSkipMonitoringForUpstreamEvent(c, last)
+			return
+		}
+	}
+
 	evCopy := ev
 	existing = append(existing, &evCopy)
 	c.Set(OpsUpstreamErrorsKey, existing)
 
 	checkSkipMonitoringForUpstreamEvent(c, &evCopy)
+}
+
+func shouldAggregateOpsUpstreamRetry(existing, next *OpsUpstreamErrorEvent) bool {
+	if existing == nil || next == nil {
+		return false
+	}
+	if existing.Kind != "retry" || next.Kind != "retry" {
+		return false
+	}
+	return existing.AccountID == next.AccountID &&
+		existing.Platform == next.Platform &&
+		existing.Passthrough == next.Passthrough
 }
 
 // checkSkipMonitoringForUpstreamEvent checks whether the upstream error event

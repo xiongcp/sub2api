@@ -60,8 +60,11 @@ const expired = ref(false)
 const cancelling = ref(false)
 const paymentType = ref('')
 
-let pollTimer: ReturnType<typeof setInterval> | null = null
+const POLL_INTERVALS_MS = [3000, 5000, 8000, 15000] as const
+
+let pollTimer: ReturnType<typeof setTimeout> | null = null
 let countdownTimer: ReturnType<typeof setInterval> | null = null
+let pollAttempt = 0
 
 const countdownDisplay = computed(() => {
   const m = Math.floor(remainingSeconds.value / 60)
@@ -144,6 +147,19 @@ async function pollStatus() {
   }
 }
 
+function scheduleNextPoll() {
+  if (!orderId.value || expired.value) return
+  const delay = POLL_INTERVALS_MS[Math.min(pollAttempt, POLL_INTERVALS_MS.length - 1)]
+  pollTimer = setTimeout(async () => {
+    pollTimer = null
+    await pollStatus()
+    if (!expired.value) {
+      pollAttempt += 1
+      scheduleNextPoll()
+    }
+  }, delay)
+}
+
 function startCountdown(seconds: number) {
   remainingSeconds.value = Math.max(0, seconds)
   if (remainingSeconds.value <= 0) {
@@ -174,8 +190,9 @@ async function handleCancel() {
 }
 
 function cleanup() {
-  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null }
   if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
+  pollAttempt = 0
 }
 
 watch(qrUrl, () => renderQR())
@@ -195,7 +212,8 @@ onMounted(() => {
     seconds = Math.floor((expiresAt.getTime() - now.getTime()) / 1000)
   }
   startCountdown(seconds)
-  pollTimer = setInterval(pollStatus, 3000)
+  pollAttempt = 0
+  scheduleNextPoll()
   renderQR()
 })
 

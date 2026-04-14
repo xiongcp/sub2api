@@ -25,6 +25,10 @@ type RateLimitOptions struct {
 	FailureMode RateLimitFailureMode
 }
 
+// RateLimitKeyFunc returns the identity segment used to build the Redis rate-limit key.
+// The bool return indicates whether a custom identity was produced.
+type RateLimitKeyFunc func(*gin.Context) (string, bool)
+
 var rateLimitScript = redis.NewScript(`
 local current = redis.call('INCR', KEYS[1])
 local ttl = redis.call('PTTL', KEYS[1])
@@ -82,14 +86,31 @@ func (r *RateLimiter) Limit(key string, limit int, window time.Duration) gin.Han
 
 // LimitWithOptions 返回速率限制中间件（带可选配置）
 func (r *RateLimiter) LimitWithOptions(key string, limit int, window time.Duration, opts RateLimitOptions) gin.HandlerFunc {
+	return r.LimitWithKeyOptions(key, limit, window, nil, opts)
+}
+
+// LimitWithKeyOptions 返回速率限制中间件（支持自定义身份维度）
+func (r *RateLimiter) LimitWithKeyOptions(key string, limit int, window time.Duration, keyFunc RateLimitKeyFunc, opts RateLimitOptions) gin.HandlerFunc {
 	failureMode := opts.FailureMode
 	if failureMode != RateLimitFailClose {
 		failureMode = RateLimitFailOpen
 	}
 
 	return func(c *gin.Context) {
-		ip := c.ClientIP()
-		redisKey := r.prefix + key + ":" + ip
+		identity := c.ClientIP()
+		if keyFunc != nil {
+			if customIdentity, ok := keyFunc(c); ok {
+				customIdentity = strconv.QuoteToASCII(customIdentity)
+				customIdentity = customIdentity[1 : len(customIdentity)-1]
+				if customIdentity != "" {
+					identity = customIdentity
+				}
+			}
+		}
+		if identity == "" {
+			identity = "unknown"
+		}
+		redisKey := r.prefix + key + ":" + identity
 
 		ctx := c.Request.Context()
 

@@ -23,6 +23,7 @@ func newAuthRoutesTestRouter(redisClient *redis.Client) *gin.Engine {
 		v1,
 		&handler.Handlers{
 			Auth:    &handler.AuthHandler{},
+			Gateway: &handler.GatewayHandler{},
 			Setting: &handler.SettingHandler{},
 		},
 		servermiddleware.JWTAuthMiddleware(func(c *gin.Context) {
@@ -52,10 +53,15 @@ func TestAuthRoutesRateLimitFailCloseWhenRedisUnavailable(t *testing.T) {
 		"/api/v1/auth/login",
 		"/api/v1/auth/login/2fa",
 		"/api/v1/auth/send-verify-code",
+		"/api/v1/public/key-usage/query",
 	}
 
 	for _, path := range paths {
-		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{}`))
+		payload := `{}`
+		if path == "/api/v1/public/key-usage/query" {
+			payload = `{"api_key":"sk-test"}`
+		}
+		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(payload))
 		req.Header.Set("Content-Type", "application/json")
 		req.RemoteAddr = "203.0.113.10:12345"
 

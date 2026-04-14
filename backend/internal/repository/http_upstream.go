@@ -96,6 +96,18 @@ type httpUpstreamService struct {
 	clients map[string]*upstreamClientEntry // 客户端缓存池，key 由隔离策略决定
 }
 
+var (
+	httpUpstreamClientCacheHits   atomic.Int64
+	httpUpstreamClientCacheMisses atomic.Int64
+	httpUpstreamClientEvictions   atomic.Int64
+)
+
+func HTTPUpstreamClientPoolStats() (hits, misses, evictions int64) {
+	return httpUpstreamClientCacheHits.Load(),
+		httpUpstreamClientCacheMisses.Load(),
+		httpUpstreamClientEvictions.Load()
+}
+
 // NewHTTPUpstream 创建通用 HTTP 上游服务
 // 使用配置中的连接池参数构建 Transport
 //
@@ -234,6 +246,7 @@ func (s *httpUpstreamService) getClientEntryWithTLS(proxyURL string, accountID i
 		if markInFlight {
 			atomic.AddInt64(&entry.inFlight, 1)
 		}
+		httpUpstreamClientCacheHits.Add(1)
 		s.mu.RUnlock()
 		slog.Debug("tls_fingerprint_reusing_client", "account_id", accountID, "cache_key", cacheKey)
 		return entry, nil
@@ -248,6 +261,7 @@ func (s *httpUpstreamService) getClientEntryWithTLS(proxyURL string, accountID i
 			if markInFlight {
 				atomic.AddInt64(&entry.inFlight, 1)
 			}
+			httpUpstreamClientCacheHits.Add(1)
 			s.mu.Unlock()
 			slog.Debug("tls_fingerprint_reusing_client", "account_id", accountID, "cache_key", cacheKey)
 			return entry, nil
@@ -295,6 +309,7 @@ func (s *httpUpstreamService) getClientEntryWithTLS(proxyURL string, accountID i
 		atomic.StoreInt64(&entry.inFlight, 1)
 	}
 	s.clients[cacheKey] = entry
+	httpUpstreamClientCacheMisses.Add(1)
 
 	s.evictIdleLocked(now)
 	s.evictOverLimitLocked()
@@ -387,6 +402,7 @@ func (s *httpUpstreamService) getClientEntry(proxyURL string, accountID int64, a
 		if markInFlight {
 			atomic.AddInt64(&entry.inFlight, 1)
 		}
+		httpUpstreamClientCacheHits.Add(1)
 		s.mu.RUnlock()
 		return entry, nil
 	}
@@ -400,6 +416,7 @@ func (s *httpUpstreamService) getClientEntry(proxyURL string, accountID int64, a
 			if markInFlight {
 				atomic.AddInt64(&entry.inFlight, 1)
 			}
+			httpUpstreamClientCacheHits.Add(1)
 			s.mu.Unlock()
 			return entry, nil
 		}
@@ -438,6 +455,7 @@ func (s *httpUpstreamService) getClientEntry(proxyURL string, accountID int64, a
 		atomic.StoreInt64(&entry.inFlight, 1)
 	}
 	s.clients[cacheKey] = entry
+	httpUpstreamClientCacheMisses.Add(1)
 
 	// 执行淘汰策略：先淘汰空闲超时的，再淘汰超出数量限制的
 	s.evictIdleLocked(now)
@@ -469,6 +487,7 @@ func (s *httpUpstreamService) shouldReuseEntry(entry *upstreamClientEntry, isola
 //   - entry: 客户端条目
 func (s *httpUpstreamService) removeClientLocked(key string, entry *upstreamClientEntry) {
 	delete(s.clients, key)
+	httpUpstreamClientEvictions.Add(1)
 	if entry != nil && entry.client != nil {
 		// 关闭空闲连接，释放系统资源
 		// 注意：这不会中断活跃连接

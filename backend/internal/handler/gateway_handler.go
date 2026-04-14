@@ -43,6 +43,7 @@ type GatewayHandler struct {
 	billingCacheService       *service.BillingCacheService
 	usageService              *service.UsageService
 	apiKeyService             *service.APIKeyService
+	subscriptionService       *service.SubscriptionService
 	usageRecordWorkerPool     *service.UsageRecordWorkerPool
 	errorPassthroughService   *service.ErrorPassthroughService
 	concurrencyHelper         *ConcurrencyHelper
@@ -63,6 +64,7 @@ func NewGatewayHandler(
 	billingCacheService *service.BillingCacheService,
 	usageService *service.UsageService,
 	apiKeyService *service.APIKeyService,
+	subscriptionService *service.SubscriptionService,
 	usageRecordWorkerPool *service.UsageRecordWorkerPool,
 	errorPassthroughService *service.ErrorPassthroughService,
 	userMsgQueueService *service.UserMessageQueueService,
@@ -96,6 +98,7 @@ func NewGatewayHandler(
 		billingCacheService:       billingCacheService,
 		usageService:              usageService,
 		apiKeyService:             apiKeyService,
+		subscriptionService:       subscriptionService,
 		usageRecordWorkerPool:     usageRecordWorkerPool,
 		errorPassthroughService:   errorPassthroughService,
 		concurrencyHelper:         NewConcurrencyHelper(concurrencyService, SSEPingFormatClaude, pingInterval),
@@ -942,29 +945,13 @@ func (h *GatewayHandler) Usage(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	// 解析可选的日期范围参数（用于 model_stats 查询）
 	startTime, endTime := h.parseUsageDateRange(c)
-
-	// Best-effort: 获取用量统计（按当前 API Key 过滤），失败不影响基础响应
-	usageData := h.buildUsageData(ctx, apiKey.ID)
-
-	// Best-effort: 获取模型统计
-	var modelStats any
-	if h.usageService != nil {
-		if stats, err := h.usageService.GetAPIKeyModelStats(ctx, apiKey.ID, startTime, endTime); err == nil && len(stats) > 0 {
-			modelStats = stats
-		}
-	}
-
-	// 判断模式: key 有总额度或速率限制 → quota_limited，否则 → unrestricted
-	isQuotaLimited := apiKey.Quota > 0 || apiKey.HasRateLimits()
-
-	if isQuotaLimited {
-		h.usageQuotaLimited(c, ctx, apiKey, usageData, modelStats)
+	resp, err := h.buildUsageResponsePayload(ctx, c, apiKey, subject, startTime, endTime)
+	if err != nil {
+		h.errorResponse(c, http.StatusInternalServerError, "api_error", "Failed to get usage info")
 		return
 	}
-
-	h.usageUnrestricted(c, ctx, apiKey, subject, usageData, modelStats)
+	c.JSON(http.StatusOK, resp)
 }
 
 // parseUsageDateRange 解析 start_date / end_date query params，默认返回近 30 天范围
@@ -1024,151 +1011,15 @@ func (h *GatewayHandler) buildUsageData(ctx context.Context, apiKeyID int64) gin
 
 // usageQuotaLimited 处理 quota_limited 模式的响应
 func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, apiKey *service.APIKey, usageData gin.H, modelStats any) {
-	resp := gin.H{
-		"mode":    "quota_limited",
-		"isValid": apiKey.Status == service.StatusAPIKeyActive || apiKey.Status == service.StatusAPIKeyQuotaExhausted || apiKey.Status == service.StatusAPIKeyExpired,
-		"status":  apiKey.Status,
-	}
-
-	// 总额度信息
-	if apiKey.Quota > 0 {
-		remaining := apiKey.GetQuotaRemaining()
-		resp["quota"] = gin.H{
-			"limit":     apiKey.Quota,
-			"used":      apiKey.QuotaUsed,
-			"remaining": remaining,
-			"unit":      "USD",
-		}
-		resp["remaining"] = remaining
-		resp["unit"] = "USD"
-	}
-
-	// 速率限制信息（从 DB 获取实时用量）
-	if apiKey.HasRateLimits() && h.apiKeyService != nil {
-		rateLimitData, err := h.apiKeyService.GetRateLimitData(ctx, apiKey.ID)
-		if err == nil && rateLimitData != nil {
-			var rateLimits []gin.H
-			if apiKey.RateLimit5h > 0 {
-				used := rateLimitData.EffectiveUsage5h()
-				entry := gin.H{
-					"window":       "5h",
-					"limit":        apiKey.RateLimit5h,
-					"used":         used,
-					"remaining":    max(0, apiKey.RateLimit5h-used),
-					"window_start": rateLimitData.Window5hStart,
-				}
-				if rateLimitData.Window5hStart != nil && !service.IsWindowExpired(rateLimitData.Window5hStart, service.RateLimitWindow5h) {
-					entry["reset_at"] = rateLimitData.Window5hStart.Add(service.RateLimitWindow5h)
-				}
-				rateLimits = append(rateLimits, entry)
-			}
-			if apiKey.RateLimit1d > 0 {
-				used := rateLimitData.EffectiveUsage1d()
-				entry := gin.H{
-					"window":       "1d",
-					"limit":        apiKey.RateLimit1d,
-					"used":         used,
-					"remaining":    max(0, apiKey.RateLimit1d-used),
-					"window_start": rateLimitData.Window1dStart,
-				}
-				if rateLimitData.Window1dStart != nil && !service.IsWindowExpired(rateLimitData.Window1dStart, service.RateLimitWindow1d) {
-					entry["reset_at"] = rateLimitData.Window1dStart.Add(service.RateLimitWindow1d)
-				}
-				rateLimits = append(rateLimits, entry)
-			}
-			if apiKey.RateLimit7d > 0 {
-				used := rateLimitData.EffectiveUsage7d()
-				entry := gin.H{
-					"window":       "7d",
-					"limit":        apiKey.RateLimit7d,
-					"used":         used,
-					"remaining":    max(0, apiKey.RateLimit7d-used),
-					"window_start": rateLimitData.Window7dStart,
-				}
-				if rateLimitData.Window7dStart != nil && !service.IsWindowExpired(rateLimitData.Window7dStart, service.RateLimitWindow7d) {
-					entry["reset_at"] = rateLimitData.Window7dStart.Add(service.RateLimitWindow7d)
-				}
-				rateLimits = append(rateLimits, entry)
-			}
-			if len(rateLimits) > 0 {
-				resp["rate_limits"] = rateLimits
-			}
-		}
-	}
-
-	// 过期时间
-	if apiKey.ExpiresAt != nil {
-		resp["expires_at"] = apiKey.ExpiresAt
-		resp["days_until_expiry"] = apiKey.GetDaysUntilExpiry()
-	}
-
-	if usageData != nil {
-		resp["usage"] = usageData
-	}
-	if modelStats != nil {
-		resp["model_stats"] = modelStats
-	}
-
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, h.buildUsageQuotaLimitedResponse(ctx, apiKey, usageData, modelStats))
 }
 
 // usageUnrestricted 处理 unrestricted 模式的响应（向后兼容）
 func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, apiKey *service.APIKey, subject middleware2.AuthSubject, usageData gin.H, modelStats any) {
-	// 订阅模式
-	if apiKey.Group != nil && apiKey.Group.IsSubscriptionType() {
-		resp := gin.H{
-			"mode":     "unrestricted",
-			"isValid":  true,
-			"planName": apiKey.Group.Name,
-			"unit":     "USD",
-		}
-
-		// 订阅信息可能不在 context 中（/v1/usage 路径跳过了中间件的计费检查）
-		subscription, ok := middleware2.GetSubscriptionFromContext(c)
-		if ok {
-			remaining := h.calculateSubscriptionRemaining(apiKey.Group, subscription)
-			resp["remaining"] = remaining
-			resp["subscription"] = gin.H{
-				"daily_usage_usd":   subscription.DailyUsageUSD,
-				"weekly_usage_usd":  subscription.WeeklyUsageUSD,
-				"monthly_usage_usd": subscription.MonthlyUsageUSD,
-				"daily_limit_usd":   apiKey.Group.DailyLimitUSD,
-				"weekly_limit_usd":  apiKey.Group.WeeklyLimitUSD,
-				"monthly_limit_usd": apiKey.Group.MonthlyLimitUSD,
-				"expires_at":        subscription.ExpiresAt,
-			}
-		}
-
-		if usageData != nil {
-			resp["usage"] = usageData
-		}
-		if modelStats != nil {
-			resp["model_stats"] = modelStats
-		}
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-
-	// 余额模式
-	latestUser, err := h.userService.GetByID(ctx, subject.UserID)
+	resp, err := h.buildUsageUnrestrictedResponse(ctx, c, apiKey, subject, usageData, modelStats)
 	if err != nil {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "Failed to get user info")
 		return
-	}
-
-	resp := gin.H{
-		"mode":      "unrestricted",
-		"isValid":   true,
-		"planName":  "钱包余额",
-		"remaining": latestUser.Balance,
-		"unit":      "USD",
-		"balance":   latestUser.Balance,
-	}
-	if usageData != nil {
-		resp["usage"] = usageData
-	}
-	if modelStats != nil {
-		resp["model_stats"] = modelStats
 	}
 	c.JSON(http.StatusOK, resp)
 }

@@ -117,7 +117,7 @@ export default {
     placeholder: 'sk-ant-mirror-xxxxxxxxxxxx',
     query: 'Query',
     querying: 'Querying...',
-    privacyNote: 'Your Key is processed locally in the browser and will not be stored',
+    privacyNote: 'This API Key is only used to validate the current lookup. Avoid entering it on untrusted devices.',
     dateRange: 'Date Range:',
     dateRangeToday: 'Today',
     dateRange7d: '7 Days',
@@ -128,8 +128,11 @@ export default {
     detailInfo: 'Detail Information',
     tokenStats: 'Token Statistics',
     modelStats: 'Model Usage Statistics',
+    requestDetails: 'Request Details',
     // Table headers
+    createdAt: 'Created At',
     model: 'Model',
+    requestType: 'Request Type',
     requests: 'Requests',
     inputTokens: 'Input Tokens',
     outputTokens: 'Output Tokens',
@@ -137,6 +140,14 @@ export default {
     cacheReadTokens: 'Cache Read',
     totalTokens: 'Total Tokens',
     cost: 'Cost',
+    duration: 'Duration',
+    endpoint: 'Endpoint',
+    serviceTier: 'Service Tier',
+    reasoningEffort: 'Reasoning Effort',
+    pageInfo: 'Page {page} / {pages}, total {total}',
+    prevPage: 'Previous',
+    nextPage: 'Next',
+    emptyLogs: 'No request details in the selected range',
     // Status
     quotaMode: 'Key Quota Mode',
     walletBalance: 'Wallet Balance',
@@ -178,6 +189,7 @@ export default {
     querySuccess: 'Query successful',
     queryFailed: 'Query failed',
     queryFailedRetry: 'Query failed, please try again later',
+    rateLimited: 'Too many queries. Please try again later.',
   },
 
   // Setup Wizard
@@ -2124,6 +2136,7 @@ export default {
         rateLimited: 'Rate Limited',
         overloaded: 'Overloaded',
         tempUnschedulable: 'Temp Unschedulable',
+        lowQuotaThreshold: 'Low Quota Threshold',
         unschedulable: 'Unschedulable',
         rateLimitedUntil: 'Rate limited and removed from scheduling. Auto resumes at {time}',
         rateLimitedAutoResume: 'Auto resumes in {time}',
@@ -2189,7 +2202,9 @@ export default {
         },
         quota: {
           exceeded: 'Quota exceeded, account paused',
-          normal: 'Quota normal'
+          normal: 'Quota normal',
+          lowQuotaThreshold: 'Low-quota stop-scheduling threshold configured',
+          lowQuotaThresholdTriggered: 'Remaining quota is below threshold; account is excluded from scheduling'
         },
       },
       tempUnschedulable: {
@@ -2248,6 +2263,12 @@ export default {
       quotaWeeklyLimitHint: 'Automatically resets every 7 days from first usage.',
       quotaTotalLimit: 'Total Limit',
       quotaTotalLimitHint: 'Cumulative spending limit. Does not auto-reset — use "Reset Quota" to clear.',
+      quotaMinRemaining: 'Minimum Remaining Quota Threshold',
+      quotaMinRemainingPlaceholder: 'Leave empty to disable',
+      quotaMinRemainingHint: 'Stop scheduling this account when total remaining quota falls below this amount.',
+      quotaMinRemainingRatio: 'Minimum Remaining Quota Ratio Threshold',
+      quotaMinRemainingRatioPlaceholder: 'Leave empty to disable',
+      quotaMinRemainingRatioHint: 'Stop scheduling this account when remaining quota / total quota falls below this ratio.',
       quotaResetMode: 'Reset Mode',
       quotaResetModeRolling: 'Rolling Window',
       quotaResetModeFixed: 'Fixed Time',

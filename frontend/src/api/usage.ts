@@ -58,6 +58,85 @@ export interface ModelStatsResponse {
   end_date: string
 }
 
+export interface PublicUsageLogItem {
+  id: number
+  request_id: string
+  model: string
+  request_type: string
+  service_tier?: string | null
+  reasoning_effort?: string | null
+  inbound_endpoint?: string | null
+  input_tokens: number
+  output_tokens: number
+  cache_creation_tokens: number
+  cache_read_tokens: number
+  total_tokens: number
+  actual_cost: number
+  duration_ms?: number | null
+  created_at: string
+}
+
+export interface PublicKeyUsageLogPage extends PaginatedResponse<PublicUsageLogItem> {}
+
+export interface PublicKeyUsageRateLimit {
+  window: string
+  limit: number
+  used: number
+  remaining: number
+  window_start?: string | null
+  reset_at?: string | null
+}
+
+export interface PublicKeyUsageQuota {
+  limit: number
+  used: number
+  remaining: number
+  unit: string
+}
+
+export interface PublicKeyUsageStatsBucket {
+  requests: number
+  input_tokens: number
+  output_tokens: number
+  cache_creation_tokens: number
+  cache_read_tokens: number
+  total_tokens: number
+  cost: number
+  actual_cost: number
+}
+
+export interface PublicKeyUsageResponse {
+  mode: 'quota_limited' | 'unrestricted'
+  isValid: boolean
+  status?: string
+  planName?: string
+  remaining?: number
+  unit?: string
+  balance?: number
+  quota?: PublicKeyUsageQuota
+  rate_limits?: PublicKeyUsageRateLimit[]
+  expires_at?: string | null
+  days_until_expiry?: number | null
+  subscription?: {
+    daily_usage_usd: number
+    weekly_usage_usd: number
+    monthly_usage_usd: number
+    daily_limit_usd?: number | null
+    weekly_limit_usd?: number | null
+    monthly_limit_usd?: number | null
+    expires_at?: string | null
+  }
+  usage?: {
+    today: PublicKeyUsageStatsBucket
+    total: PublicKeyUsageStatsBucket
+    average_duration_ms: number
+    rpm: number
+    tpm: number
+  }
+  model_stats?: ModelStat[]
+  usage_logs?: PublicKeyUsageLogPage
+}
+
 /**
  * List usage logs with optional filters
  * @param page - Page number (default: 1)
@@ -189,6 +268,18 @@ export async function getById(id: number): Promise<UsageLog> {
   return data
 }
 
+export async function queryPublicKeyUsage(payload: {
+  api_key: string
+  start_date?: string
+  end_date?: string
+  page?: number
+  page_size?: number
+  timezone?: string
+}): Promise<PublicKeyUsageResponse> {
+  const { data } = await apiClient.post<PublicKeyUsageResponse>('/public/key-usage/query', payload)
+  return data
+}
+
 // ==================== Dashboard API ====================
 
 /**
@@ -264,6 +355,7 @@ export const usageAPI = {
   getStatsByDateRange,
   getByDateRange,
   getById,
+  queryPublicKeyUsage,
   // Dashboard
   getDashboardStats,
   getDashboardTrend,

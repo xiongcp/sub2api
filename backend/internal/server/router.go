@@ -18,6 +18,7 @@ import (
 )
 
 const frameSrcRefreshTimeout = 5 * time.Second
+const controlPlaneMaxBodyBytes int64 = 4 << 20
 
 // SetupRouter 配置路由器中间件和路由
 func SetupRouter(
@@ -105,11 +106,12 @@ func registerRoutes(
 
 	// API v1
 	v1 := r.Group("/api/v1")
+	v1.Use(middleware2.RequestBodyLimit(controlPlaneMaxBodyBytes))
 
 	// 注册各模块路由
 	routes.RegisterAuthRoutes(v1, h, jwtAuth, redisClient, settingService)
 	routes.RegisterUserRoutes(v1, h, jwtAuth, settingService)
-	routes.RegisterAdminRoutes(v1, h, adminAuth)
+	routes.RegisterAdminRoutes(v1, h, adminAuth, redisClient)
 	routes.RegisterGatewayRoutes(r, h, apiKeyAuth, apiKeyService, subscriptionService, opsService, settingService, cfg)
-	routes.RegisterPaymentRoutes(v1, h.Payment, h.PaymentWebhook, h.Admin.Payment, jwtAuth, adminAuth, settingService)
+	routes.RegisterPaymentRoutes(v1, h.Payment, h.PaymentWebhook, h.Admin.Payment, jwtAuth, adminAuth, settingService, redisClient)
 }

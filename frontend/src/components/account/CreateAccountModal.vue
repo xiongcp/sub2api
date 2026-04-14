@@ -1492,6 +1492,8 @@
           :totalLimit="editQuotaLimit"
           :dailyLimit="editQuotaDailyLimit"
           :weeklyLimit="editQuotaWeeklyLimit"
+          :minRemaining="editQuotaMinRemaining"
+          :minRemainingRatio="editQuotaMinRemainingRatio"
           :quotaNotifyGlobalEnabled="quotaNotifyGlobalEnabled"
           :quotaNotifyDailyEnabled="quotaNotifyState.daily.enabled"
           :quotaNotifyDailyThreshold="quotaNotifyState.daily.threshold"
@@ -1511,6 +1513,8 @@
           @update:totalLimit="editQuotaLimit = $event"
           @update:dailyLimit="editQuotaDailyLimit = $event"
           @update:weeklyLimit="editQuotaWeeklyLimit = $event"
+          @update:minRemaining="editQuotaMinRemaining = $event"
+          @update:minRemainingRatio="editQuotaMinRemainingRatio = $event"
           @update:quotaNotifyDailyEnabled="quotaNotifyState.daily.enabled = $event"
           @update:quotaNotifyDailyThreshold="quotaNotifyState.daily.threshold = $event"
           @update:quotaNotifyDailyThresholdType="quotaNotifyState.daily.thresholdType = $event"
@@ -1544,6 +1548,8 @@
           :totalLimit="editQuotaLimit"
           :dailyLimit="editQuotaDailyLimit"
           :weeklyLimit="editQuotaWeeklyLimit"
+          :minRemaining="editQuotaMinRemaining"
+          :minRemainingRatio="editQuotaMinRemainingRatio"
           :quotaNotifyGlobalEnabled="quotaNotifyGlobalEnabled"
           :quotaNotifyDailyEnabled="quotaNotifyState.daily.enabled"
           :quotaNotifyDailyThreshold="quotaNotifyState.daily.threshold"
@@ -1563,6 +1569,8 @@
           @update:totalLimit="editQuotaLimit = $event"
           @update:dailyLimit="editQuotaDailyLimit = $event"
           @update:weeklyLimit="editQuotaWeeklyLimit = $event"
+          @update:minRemaining="editQuotaMinRemaining = $event"
+          @update:minRemainingRatio="editQuotaMinRemainingRatio = $event"
           @update:quotaNotifyDailyEnabled="quotaNotifyState.daily.enabled = $event"
           @update:quotaNotifyDailyThreshold="quotaNotifyState.daily.threshold = $event"
           @update:quotaNotifyDailyThresholdType="quotaNotifyState.daily.thresholdType = $event"
@@ -3052,6 +3060,8 @@ const apiKeyValue = ref('')
 const editQuotaLimit = ref<number | null>(null)
 const editQuotaDailyLimit = ref<number | null>(null)
 const editQuotaWeeklyLimit = ref<number | null>(null)
+const editQuotaMinRemaining = ref<number | null>(null)
+const editQuotaMinRemainingRatio = ref<number | null>(null)
 const editDailyResetMode = ref<'rolling' | 'fixed' | null>(null)
 const editDailyResetHour = ref<number | null>(null)
 const editWeeklyResetMode = ref<'rolling' | 'fixed' | null>(null)
@@ -3775,6 +3785,8 @@ const resetForm = () => {
   editQuotaLimit.value = null
   editQuotaDailyLimit.value = null
   editQuotaWeeklyLimit.value = null
+  editQuotaMinRemaining.value = null
+  editQuotaMinRemainingRatio.value = null
   editDailyResetMode.value = null
   editDailyResetHour.value = null
   editWeeklyResetMode.value = null
@@ -4179,6 +4191,12 @@ const createAccountAndFinish = async (
     }
     if (editQuotaWeeklyLimit.value != null && editQuotaWeeklyLimit.value > 0) {
       quotaExtra.quota_weekly_limit = editQuotaWeeklyLimit.value
+    }
+    if (editQuotaMinRemaining.value != null && editQuotaMinRemaining.value > 0) {
+      quotaExtra.quota_min_remaining = editQuotaMinRemaining.value
+    }
+    if (editQuotaMinRemainingRatio.value != null && editQuotaMinRemainingRatio.value > 0) {
+      quotaExtra.quota_min_remaining_ratio = editQuotaMinRemainingRatio.value
     }
     // Quota reset mode config
     if (editDailyResetMode.value === 'fixed') {

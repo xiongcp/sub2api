@@ -32,6 +32,22 @@
     <QuotaBadge v-if="showDailyQuota" :used="account.quota_daily_used ?? 0" :limit="account.quota_daily_limit!" label="D" />
     <QuotaBadge v-if="showWeeklyQuota" :used="account.quota_weekly_used ?? 0" :limit="account.quota_weekly_limit!" label="W" />
     <QuotaBadge v-if="showTotalQuota" :used="account.quota_used ?? 0" :limit="account.quota_limit!" />
+    <div v-if="showLowQuotaThreshold" class="flex items-center gap-1">
+      <span
+        :class="[
+          'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium',
+          lowQuotaThresholdClass
+        ]"
+        :title="lowQuotaThresholdTooltip"
+      >
+        <svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM12 16.5h.008v.008H12v-.008Z" />
+        </svg>
+        <span class="font-mono">${{ formatCost(quotaRemaining) }}</span>
+        <span class="text-gray-400 dark:text-gray-500">≥</span>
+        <span class="font-mono">{{ lowQuotaThresholdLabel }}</span>
+      </span>
+    </div>
   </div>
 </template>
 
@@ -187,4 +203,41 @@ const showWeeklyQuota = computed(() =>
 const showTotalQuota = computed(() =>
   isQuotaEligible.value && props.account.quota_limit != null && props.account.quota_limit > 0
 )
+
+const quotaRemaining = computed(() => props.account.quota_remaining ?? 0)
+
+const showLowQuotaThreshold = computed(() => {
+  return (
+    showTotalQuota.value &&
+    (
+      (props.account.quota_min_remaining ?? 0) > 0 ||
+      (props.account.quota_min_remaining_ratio ?? 0) > 0
+    )
+  )
+})
+
+const lowQuotaThresholdLabel = computed(() => {
+  const parts: string[] = []
+  if ((props.account.quota_min_remaining ?? 0) > 0) {
+    parts.push(`$${formatCost(props.account.quota_min_remaining)}`)
+  }
+  if ((props.account.quota_min_remaining_ratio ?? 0) > 0) {
+    parts.push(`${Math.round((props.account.quota_min_remaining_ratio ?? 0) * 100)}%`)
+  }
+  return parts.join(' / ')
+})
+
+const lowQuotaThresholdClass = computed(() => {
+  if (props.account.low_quota_threshold_triggered) {
+    return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+  }
+  return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+})
+
+const lowQuotaThresholdTooltip = computed(() => {
+  if (props.account.low_quota_threshold_triggered) {
+    return t('admin.accounts.capacity.quota.lowQuotaThresholdTriggered')
+  }
+  return t('admin.accounts.capacity.quota.lowQuotaThreshold')
+})
 </script>

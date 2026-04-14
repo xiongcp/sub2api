@@ -752,10 +752,14 @@ export interface Account {
   // API Key 账号配额限制
   quota_limit?: number | null
   quota_used?: number | null
+  quota_remaining?: number | null
   quota_daily_limit?: number | null
   quota_daily_used?: number | null
   quota_weekly_limit?: number | null
   quota_weekly_used?: number | null
+  quota_min_remaining?: number | null
+  quota_min_remaining_ratio?: number | null
+  low_quota_threshold_triggered?: boolean | null
 
   // 配额固定时间重置配置
   quota_daily_reset_mode?: 'rolling' | 'fixed' | null

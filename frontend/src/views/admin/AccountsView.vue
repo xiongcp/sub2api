@@ -445,7 +445,7 @@ const sortState = reactive<AccountSortState>(loadInitialAccountSortState())
 const showAutoRefreshDropdown = ref(false)
 const autoRefreshDropdownRef = ref<HTMLElement | null>(null)
 const AUTO_REFRESH_STORAGE_KEY = 'account-auto-refresh'
-const autoRefreshIntervals = [5, 10, 15, 30] as const
+const autoRefreshIntervals = [15, 30] as const
 const autoRefreshEnabled = ref(false)
 const autoRefreshIntervalSeconds = ref<(typeof autoRefreshIntervals)[number]>(30)
 const autoRefreshCountdown = ref(0)
@@ -514,8 +514,6 @@ const refreshTodayStatsBatch = async () => {
 }
 
 const autoRefreshIntervalLabel = (sec: number) => {
-  if (sec === 5) return t('admin.accounts.refreshInterval5s')
-  if (sec === 10) return t('admin.accounts.refreshInterval10s')
   if (sec === 15) return t('admin.accounts.refreshInterval15s')
   if (sec === 30) return t('admin.accounts.refreshInterval30s')
   return `${sec}s`

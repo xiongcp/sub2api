@@ -54,6 +54,8 @@ const (
 	defaultModelsListCacheTTL    = 15 * time.Second
 	postUsageBillingTimeout      = 15 * time.Second
 	debugGatewayBodyEnv          = "SUB2API_DEBUG_GATEWAY_BODY"
+	gatewayRetryBodySampleRate   = 0.1
+	gatewayFailureLogWindow      = 10 * time.Second
 )
 
 const (
@@ -88,6 +90,8 @@ var (
 	modelsListCacheHitTotal   atomic.Int64
 	modelsListCacheMissTotal  atomic.Int64
 	modelsListCacheStoreTotal atomic.Int64
+
+	gatewayFailureLogLimiter = gocache.New(gatewayFailureLogWindow, time.Minute)
 )
 
 func GatewayWindowCostPrefetchStats() (cacheHit, cacheMiss, batchSQL, fallback, errCount int64) {
@@ -108,6 +112,46 @@ func GatewayUserGroupRateCacheStats() (cacheHit, cacheMiss, load, singleflightSh
 
 func GatewayModelsListCacheStats() (cacheHit, cacheMiss, store int64) {
 	return modelsListCacheHitTotal.Load(), modelsListCacheMissTotal.Load(), modelsListCacheStoreTotal.Load()
+}
+
+func gatewayRetryEventDetail(cfg *config.Config, body []byte) string {
+	if cfg == nil || !cfg.Gateway.LogUpstreamErrorBody {
+		return ""
+	}
+	if len(body) == 0 {
+		return ""
+	}
+	if mathrand.Float64() > gatewayRetryBodySampleRate {
+		return ""
+	}
+	maxBytes := cfg.Gateway.LogUpstreamErrorBodyMaxBytes
+	if maxBytes <= 0 {
+		maxBytes = 2048
+	}
+	return truncateString(string(body), maxBytes)
+}
+
+func gatewayFinalErrorDetail(cfg *config.Config, body []byte) string {
+	if cfg == nil || !cfg.Gateway.LogUpstreamErrorBody || len(body) == 0 {
+		return ""
+	}
+	maxBytes := cfg.Gateway.LogUpstreamErrorBodyMaxBytes
+	if maxBytes <= 0 {
+		maxBytes = 2048
+	}
+	return truncateString(string(body), maxBytes)
+}
+
+func gatewayFailureLogf(component, key, format string, args ...any) {
+	if strings.TrimSpace(component) == "" || strings.TrimSpace(key) == "" {
+		logger.LegacyPrintf(component, format, args...)
+		return
+	}
+	if _, found := gatewayFailureLogLimiter.Get(key); found {
+		return
+	}
+	gatewayFailureLogLimiter.SetDefault(key, struct{}{})
+	logger.LegacyPrintf(component, format, args...)
 }
 
 func openAIStreamEventIsTerminal(data string) bool {
@@ -4324,14 +4368,9 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 					UpstreamURL:        safeUpstreamURL(upstreamReq.URL.String()),
 					Kind:               "retry",
 					Message:            extractUpstreamErrorMessage(respBody),
-					Detail: func() string {
-						if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
-							return truncateString(string(respBody), s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes)
-						}
-						return ""
-					}(),
+					Detail:             gatewayRetryEventDetail(s.cfg, respBody),
 				})
-				logger.LegacyPrintf("service.gateway", "Account %d: upstream error %d, retry %d/%d after %v (elapsed=%v/%v)",
+				gatewayFailureLogf("service.gateway", fmt.Sprintf("retry:%d:%d", account.ID, resp.StatusCode), "Account %d: upstream error %d, retry %d/%d after %v (elapsed=%v/%v)",
 					account.ID, resp.StatusCode, attempt, maxRetryAttempts, delay, elapsed, maxRetryElapsed)
 				if err := sleepWithContext(ctx, delay); err != nil {
 					return nil, err
@@ -4365,7 +4404,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			resp.Body = io.NopCloser(bytes.NewReader(respBody))
 
 			// 调试日志：打印重试耗尽后的错误响应
-			logger.LegacyPrintf("service.gateway", "[Forward] Upstream error (retry exhausted, failover): Account=%d(%s) Status=%d RequestID=%s Body=%s",
+			gatewayFailureLogf("service.gateway", fmt.Sprintf("retry_exhausted_failover:%d:%d", account.ID, resp.StatusCode), "[Forward] Upstream error (retry exhausted, failover): Account=%d(%s) Status=%d RequestID=%s Body=%s",
 				account.ID, account.Name, resp.StatusCode, resp.Header.Get("x-request-id"), truncateString(string(respBody), 1000))
 
 			s.handleRetryExhaustedSideEffects(ctx, resp, account)
@@ -4377,12 +4416,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 				UpstreamRequestID:  resp.Header.Get("x-request-id"),
 				Kind:               "retry_exhausted_failover",
 				Message:            extractUpstreamErrorMessage(respBody),
-				Detail: func() string {
-					if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
-						return truncateString(string(respBody), s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes)
-					}
-					return ""
-				}(),
+				Detail:             gatewayFinalErrorDetail(s.cfg, respBody),
 			})
 			return nil, &UpstreamFailoverError{
 				StatusCode:             resp.StatusCode,
@@ -4639,14 +4673,9 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 					Passthrough:        true,
 					Kind:               "retry",
 					Message:            extractUpstreamErrorMessage(respBody),
-					Detail: func() string {
-						if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
-							return truncateString(string(respBody), s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes)
-						}
-						return ""
-					}(),
+					Detail:             gatewayRetryEventDetail(s.cfg, respBody),
 				})
-				logger.LegacyPrintf("service.gateway", "Anthropic passthrough account %d: upstream error %d, retry %d/%d after %v (elapsed=%v/%v)",
+				gatewayFailureLogf("service.gateway", fmt.Sprintf("retry_passthrough:%d:%d", account.ID, resp.StatusCode), "Anthropic passthrough account %d: upstream error %d, retry %d/%d after %v (elapsed=%v/%v)",
 					account.ID, resp.StatusCode, attempt, maxRetryAttempts, delay, elapsed, maxRetryElapsed)
 				if err := sleepWithContext(ctx, delay); err != nil {
 					return nil, err
@@ -4669,7 +4698,7 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 			_ = resp.Body.Close()
 			resp.Body = io.NopCloser(bytes.NewReader(respBody))
 
-			logger.LegacyPrintf("service.gateway", "[Anthropic Passthrough] Upstream error (retry exhausted, failover): Account=%d(%s) Status=%d RequestID=%s Body=%s",
+			gatewayFailureLogf("service.gateway", fmt.Sprintf("retry_exhausted_failover_passthrough:%d:%d", account.ID, resp.StatusCode), "[Anthropic Passthrough] Upstream error (retry exhausted, failover): Account=%d(%s) Status=%d RequestID=%s Body=%s",
 				account.ID, account.Name, resp.StatusCode, resp.Header.Get("x-request-id"), truncateString(string(respBody), 1000))
 
 			s.handleRetryExhaustedSideEffects(ctx, resp, account)
@@ -4682,12 +4711,7 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 				Passthrough:        true,
 				Kind:               "retry_exhausted_failover",
 				Message:            extractUpstreamErrorMessage(respBody),
-				Detail: func() string {
-					if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
-						return truncateString(string(respBody), s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes)
-					}
-					return ""
-				}(),
+				Detail:             gatewayFinalErrorDetail(s.cfg, respBody),
 			})
 			return nil, &UpstreamFailoverError{
 				StatusCode:             resp.StatusCode,
@@ -5354,14 +5378,9 @@ func (s *GatewayService) executeBedrockUpstream(
 					UpstreamURL:        safeUpstreamURL(upstreamReq.URL.String()),
 					Kind:               "retry",
 					Message:            extractUpstreamErrorMessage(respBody),
-					Detail: func() string {
-						if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
-							return truncateString(string(respBody), s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes)
-						}
-						return ""
-					}(),
+					Detail:             gatewayRetryEventDetail(s.cfg, respBody),
 				})
-				logger.LegacyPrintf("service.gateway", "[Bedrock] account %d: upstream error %d, retry %d/%d after %v",
+				gatewayFailureLogf("service.gateway", fmt.Sprintf("retry_bedrock:%d:%d", account.ID, resp.StatusCode), "[Bedrock] account %d: upstream error %d, retry %d/%d after %v",
 					account.ID, resp.StatusCode, attempt, maxRetryAttempts, delay)
 				if err := sleepWithContext(ctx, delay); err != nil {
 					return nil, err
@@ -5393,7 +5412,7 @@ func (s *GatewayService) handleBedrockUpstreamErrors(
 			_ = resp.Body.Close()
 			resp.Body = io.NopCloser(bytes.NewReader(respBody))
 
-			logger.LegacyPrintf("service.gateway", "[Bedrock] Upstream error (retry exhausted, failover): Account=%d(%s) Status=%d Body=%s",
+			gatewayFailureLogf("service.gateway", fmt.Sprintf("retry_exhausted_failover_bedrock:%d:%d", account.ID, resp.StatusCode), "[Bedrock] Upstream error (retry exhausted, failover): Account=%d(%s) Status=%d Body=%s",
 				account.ID, account.Name, resp.StatusCode, truncateString(string(respBody), 1000))
 
 			s.handleRetryExhaustedSideEffects(ctx, resp, account)

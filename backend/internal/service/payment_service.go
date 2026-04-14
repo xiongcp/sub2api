@@ -13,6 +13,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 	"github.com/Wei-Shaw/sub2api/internal/payment/provider"
+	gocache "github.com/patrickmn/go-cache"
 )
 
 // --- Order Status Constants ---
@@ -155,20 +156,31 @@ type TopUserStat struct {
 // --- Service ---
 
 type PaymentService struct {
-	providerMu      sync.Mutex
-	providersLoaded bool
-	entClient       *dbent.Client
-	registry        *payment.Registry
-	loadBalancer    payment.LoadBalancer
-	redeemService   *RedeemService
-	subscriptionSvc *SubscriptionService
-	configService   *PaymentConfigService
-	userRepo        UserRepository
-	groupRepo       GroupRepository
+	providerMu        sync.Mutex
+	providersLoaded   bool
+	entClient         *dbent.Client
+	registry          *payment.Registry
+	loadBalancer      payment.LoadBalancer
+	redeemService     *RedeemService
+	subscriptionSvc   *SubscriptionService
+	configService     *PaymentConfigService
+	userRepo          UserRepository
+	groupRepo         GroupRepository
+	publicVerifyCache *gocache.Cache
 }
 
 func NewPaymentService(entClient *dbent.Client, registry *payment.Registry, loadBalancer payment.LoadBalancer, redeemService *RedeemService, subscriptionSvc *SubscriptionService, configService *PaymentConfigService, userRepo UserRepository, groupRepo GroupRepository) *PaymentService {
-	return &PaymentService{entClient: entClient, registry: registry, loadBalancer: loadBalancer, redeemService: redeemService, subscriptionSvc: subscriptionSvc, configService: configService, userRepo: userRepo, groupRepo: groupRepo}
+	return &PaymentService{
+		entClient:         entClient,
+		registry:          registry,
+		loadBalancer:      loadBalancer,
+		redeemService:     redeemService,
+		subscriptionSvc:   subscriptionSvc,
+		configService:     configService,
+		userRepo:          userRepo,
+		groupRepo:         groupRepo,
+		publicVerifyCache: gocache.New(5*time.Second, time.Minute),
+	}
 }
 
 // --- Provider Registry ---

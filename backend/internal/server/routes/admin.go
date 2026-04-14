@@ -2,10 +2,14 @@
 package routes
 
 import (
+	"time"
+
 	"github.com/Wei-Shaw/sub2api/internal/handler"
+	ratelimitmiddleware "github.com/Wei-Shaw/sub2api/internal/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
 // RegisterAdminRoutes 注册管理员路由
@@ -13,12 +17,14 @@ func RegisterAdminRoutes(
 	v1 *gin.RouterGroup,
 	h *handler.Handlers,
 	adminAuth middleware.AdminAuthMiddleware,
+	redisClient *redis.Client,
 ) {
+	rateLimiter := ratelimitmiddleware.NewRateLimiter(redisClient)
 	admin := v1.Group("/admin")
 	admin.Use(gin.HandlerFunc(adminAuth))
 	{
 		// 仪表盘
-		registerDashboardRoutes(admin, h)
+		registerDashboardRoutes(admin, h, rateLimiter)
 
 		// 用户管理
 		registerUserManagementRoutes(admin, h)
@@ -27,7 +33,7 @@ func RegisterAdminRoutes(
 		registerGroupRoutes(admin, h)
 
 		// 账号管理
-		registerAccountRoutes(admin, h)
+		registerAccountRoutes(admin, h, rateLimiter)
 
 		// 公告管理
 		registerAnnouncementRoutes(admin, h)
@@ -60,7 +66,7 @@ func RegisterAdminRoutes(
 		registerBackupRoutes(admin, h)
 
 		// 运维监控（Ops）
-		registerOpsRoutes(admin, h)
+		registerOpsRoutes(admin, h, rateLimiter)
 
 		// 系统管理
 		registerSystemRoutes(admin, h)
@@ -98,8 +104,9 @@ func registerAdminAPIKeyRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	}
 }
 
-func registerOpsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+func registerOpsRoutes(admin *gin.RouterGroup, h *handler.Handlers, rateLimiter *ratelimitmiddleware.RateLimiter) {
 	ops := admin.Group("/ops")
+	ops.Use(rateLimiter.LimitWithKeyOptions("admin-ops", 240, time.Minute, authSubjectRateLimitKey, ratelimitmiddleware.RateLimitOptions{}))
 	{
 		// Realtime ops signals
 		ops.GET("/concurrency", h.Admin.Ops.GetConcurrencyStats)
@@ -188,8 +195,9 @@ func registerOpsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	}
 }
 
-func registerDashboardRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+func registerDashboardRoutes(admin *gin.RouterGroup, h *handler.Handlers, rateLimiter *ratelimitmiddleware.RateLimiter) {
 	dashboard := admin.Group("/dashboard")
+	dashboard.Use(rateLimiter.LimitWithKeyOptions("admin-dashboard", 180, time.Minute, authSubjectRateLimitKey, ratelimitmiddleware.RateLimitOptions{}))
 	{
 		dashboard.GET("/snapshot-v2", h.Admin.Dashboard.GetSnapshotV2)
 		dashboard.GET("/stats", h.Admin.Dashboard.GetStats)
@@ -247,10 +255,10 @@ func registerGroupRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	}
 }
 
-func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, rateLimiter *ratelimitmiddleware.RateLimiter) {
 	accounts := admin.Group("/accounts")
 	{
-		accounts.GET("", h.Admin.Account.List)
+		accounts.GET("", rateLimiter.LimitWithKeyOptions("admin-accounts-list", 120, time.Minute, authSubjectRateLimitKey, ratelimitmiddleware.RateLimitOptions{}), h.Admin.Account.List)
 		accounts.GET("/:id", h.Admin.Account.GetByID)
 		accounts.POST("", h.Admin.Account.Create)
 		accounts.POST("/check-mixed-channel", h.Admin.Account.CheckMixedChannel)
@@ -267,7 +275,7 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		accounts.POST("/:id/clear-error", h.Admin.Account.ClearError)
 		accounts.GET("/:id/usage", h.Admin.Account.GetUsage)
 		accounts.GET("/:id/today-stats", h.Admin.Account.GetTodayStats)
-		accounts.POST("/today-stats/batch", h.Admin.Account.GetBatchTodayStats)
+		accounts.POST("/today-stats/batch", rateLimiter.LimitWithKeyOptions("admin-accounts-today-stats-batch", 120, time.Minute, authSubjectRateLimitKey, ratelimitmiddleware.RateLimitOptions{}), h.Admin.Account.GetBatchTodayStats)
 		accounts.POST("/:id/clear-rate-limit", h.Admin.Account.ClearRateLimit)
 		accounts.POST("/:id/reset-quota", h.Admin.Account.ResetQuota)
 		accounts.GET("/:id/temp-unschedulable", h.Admin.Account.GetTempUnschedulable)

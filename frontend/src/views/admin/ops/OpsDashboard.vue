@@ -396,11 +396,12 @@ const { pause: pauseCountdown, resume: resumeCountdown } = useIntervalFn(
     if (!autoRefreshEnabled.value) return
     if (!opsEnabled.value) return
     if (loading.value) return
+    if (document.hidden) return
 
     if (autoRefreshCountdown.value <= 0) {
       // Fetch immediately when the countdown reaches 0.
       // fetchData() will reset the countdown to the full interval.
-      fetchData()
+      fetchData({ includeDeferredPanels: false })
       return
     }
 
@@ -694,8 +695,9 @@ function isOpsDisabledError(err: unknown): boolean {
   )
 }
 
-async function fetchData() {
+async function fetchData(options: { includeDeferredPanels?: boolean } = {}) {
   if (!opsEnabled.value) return
+  const includeDeferredPanels = options.includeDeferredPanels ?? true
 
   abortDashboardFetch()
   dashboardFetchSeq += 1
@@ -721,8 +723,10 @@ async function fetchData() {
       autoRefreshCountdown.value = Math.floor(autoRefreshIntervalMs.value / 1000)
     }
 
-    // Defer non-core visual panels to reduce initial blocking.
-    void refreshDeferredPanels(fetchSeq, dashboardFetchController.signal)
+    if (includeDeferredPanels) {
+      // Defer non-core visual panels to reduce initial blocking.
+      void refreshDeferredPanels(fetchSeq, dashboardFetchController.signal)
+    }
   } catch (err) {
     if (!isOpsDisabledError(err)) {
       console.error('[ops] failed to fetch dashboard data', err)

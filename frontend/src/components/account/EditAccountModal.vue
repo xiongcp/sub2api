@@ -1184,6 +1184,8 @@
           :totalLimit="editQuotaLimit"
           :dailyLimit="editQuotaDailyLimit"
           :weeklyLimit="editQuotaWeeklyLimit"
+          :minRemaining="editQuotaMinRemaining"
+          :minRemainingRatio="editQuotaMinRemainingRatio"
           :dailyResetMode="editDailyResetMode"
           :dailyResetHour="editDailyResetHour"
           :weeklyResetMode="editWeeklyResetMode"
@@ -1203,6 +1205,8 @@
           @update:totalLimit="editQuotaLimit = $event"
           @update:dailyLimit="editQuotaDailyLimit = $event"
           @update:weeklyLimit="editQuotaWeeklyLimit = $event"
+          @update:minRemaining="editQuotaMinRemaining = $event"
+          @update:minRemainingRatio="editQuotaMinRemainingRatio = $event"
           @update:dailyResetMode="editDailyResetMode = $event"
           @update:dailyResetHour="editDailyResetHour = $event"
           @update:weeklyResetMode="editWeeklyResetMode = $event"
@@ -1235,6 +1239,8 @@
           :totalLimit="editQuotaLimit"
           :dailyLimit="editQuotaDailyLimit"
           :weeklyLimit="editQuotaWeeklyLimit"
+          :minRemaining="editQuotaMinRemaining"
+          :minRemainingRatio="editQuotaMinRemainingRatio"
           :dailyResetMode="editDailyResetMode"
           :dailyResetHour="editDailyResetHour"
           :weeklyResetMode="editWeeklyResetMode"
@@ -1254,6 +1260,8 @@
           @update:totalLimit="editQuotaLimit = $event"
           @update:dailyLimit="editQuotaDailyLimit = $event"
           @update:weeklyLimit="editQuotaWeeklyLimit = $event"
+          @update:minRemaining="editQuotaMinRemaining = $event"
+          @update:minRemainingRatio="editQuotaMinRemainingRatio = $event"
           @update:dailyResetMode="editDailyResetMode = $event"
           @update:dailyResetHour="editDailyResetHour = $event"
           @update:weeklyResetMode="editWeeklyResetMode = $event"
@@ -2012,6 +2020,8 @@ loadQuotaNotifyGlobal()
 const editQuotaLimit = ref<number | null>(null)
 const editQuotaDailyLimit = ref<number | null>(null)
 const editQuotaWeeklyLimit = ref<number | null>(null)
+const editQuotaMinRemaining = ref<number | null>(null)
+const editQuotaMinRemainingRatio = ref<number | null>(null)
 const editDailyResetMode = ref<'rolling' | 'fixed' | null>(null)
 const editDailyResetHour = ref<number | null>(null)
 const editWeeklyResetMode = ref<'rolling' | 'fixed' | null>(null)
@@ -2218,6 +2228,10 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     editQuotaDailyLimit.value = (dailyVal && dailyVal > 0) ? dailyVal : null
     const weeklyVal = extra?.quota_weekly_limit as number | undefined
     editQuotaWeeklyLimit.value = (weeklyVal && weeklyVal > 0) ? weeklyVal : null
+    const minRemainingVal = extra?.quota_min_remaining as number | undefined
+    editQuotaMinRemaining.value = (minRemainingVal && minRemainingVal > 0) ? minRemainingVal : null
+    const minRemainingRatioVal = extra?.quota_min_remaining_ratio as number | undefined
+    editQuotaMinRemainingRatio.value = (minRemainingRatioVal && minRemainingRatioVal > 0) ? minRemainingRatioVal : null
     // Load quota reset mode config
     editDailyResetMode.value = (extra?.quota_daily_reset_mode as 'rolling' | 'fixed') || null
     editDailyResetHour.value = (extra?.quota_daily_reset_hour as number) ?? null
@@ -2231,6 +2245,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     editQuotaLimit.value = null
     editQuotaDailyLimit.value = null
     editQuotaWeeklyLimit.value = null
+    editQuotaMinRemaining.value = null
+    editQuotaMinRemainingRatio.value = null
     editDailyResetMode.value = null
     editDailyResetHour.value = null
     editWeeklyResetMode.value = null
@@ -2354,6 +2370,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     editQuotaWeeklyLimit.value = typeof bedrockExtra.quota_weekly_limit === 'number' ? bedrockExtra.quota_weekly_limit : null
     // Load quota notify for bedrock
     loadQuotaNotifyFromExtra(bedrockExtra)
+    editQuotaMinRemaining.value = typeof bedrockExtra.quota_min_remaining === 'number' ? bedrockExtra.quota_min_remaining : null
+    editQuotaMinRemainingRatio.value = typeof bedrockExtra.quota_min_remaining_ratio === 'number' ? bedrockExtra.quota_min_remaining_ratio : null
 
     // Load model mappings for bedrock
     const existingMappings = bedrockCreds.model_mapping as Record<string, string> | undefined
@@ -3246,6 +3264,16 @@ const handleSubmit = async () => {
         delete newExtra.quota_weekly_limit
         delete newExtra.quota_weekly_used
         delete newExtra.quota_weekly_start
+      }
+      if (editQuotaMinRemaining.value != null && editQuotaMinRemaining.value > 0) {
+        newExtra.quota_min_remaining = editQuotaMinRemaining.value
+      } else {
+        delete newExtra.quota_min_remaining
+      }
+      if (editQuotaMinRemainingRatio.value != null && editQuotaMinRemainingRatio.value > 0) {
+        newExtra.quota_min_remaining_ratio = editQuotaMinRemainingRatio.value
+      } else {
+        delete newExtra.quota_min_remaining_ratio
       }
       // Quota reset mode config
       if (editDailyResetMode.value === 'fixed') {

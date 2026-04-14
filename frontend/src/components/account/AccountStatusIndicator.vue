@@ -279,6 +279,8 @@ const isTempUnschedulable = computed(() => {
   return new Date(props.account.temp_unschedulable_until) > new Date()
 })
 
+const isLowQuotaThresholdTriggered = computed(() => props.account.low_quota_threshold_triggered === true)
+
 // Computed: has error status
 const hasError = computed(() => {
   return props.account.status === 'error'
@@ -307,6 +309,9 @@ const statusClass = computed(() => {
   if (isTempUnschedulable.value) {
     return 'badge-warning'
   }
+  if (isLowQuotaThresholdTriggered.value) {
+    return 'badge-warning'
+  }
   if (!props.account.schedulable) {
     return 'badge-gray'
   }
@@ -329,6 +334,9 @@ const statusText = computed(() => {
   }
   if (isTempUnschedulable.value) {
     return t('admin.accounts.status.tempUnschedulable')
+  }
+  if (isLowQuotaThresholdTriggered.value) {
+    return t('admin.accounts.status.lowQuotaThreshold')
   }
   if (!props.account.schedulable) {
     return t('admin.accounts.status.paused')

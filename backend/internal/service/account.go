@@ -121,6 +121,9 @@ func (a *Account) IsSchedulable() bool {
 	if a.TempUnschedulableUntil != nil && now.Before(*a.TempUnschedulableUntil) {
 		return false
 	}
+	if a.IsBelowQuotaSchedulingThreshold() {
+		return false
+	}
 	return true
 }
 
@@ -1397,6 +1400,62 @@ func (a *Account) GetQuotaLimit() float64 {
 // GetQuotaUsed 获取 API Key 账号的已用配额（美元）
 func (a *Account) GetQuotaUsed() float64 {
 	return a.getExtraFloat64("quota_used")
+}
+
+// GetQuotaRemaining 获取总额度剩余值；未配置总额度时返回 0。
+func (a *Account) GetQuotaRemaining() float64 {
+	limit := a.GetQuotaLimit()
+	if limit <= 0 {
+		return 0
+	}
+	return limit - a.GetQuotaUsed()
+}
+
+// GetQuotaMinRemaining 获取停止调度的最小剩余额度阈值（美元）。
+// 返回 0 表示未启用。
+func (a *Account) GetQuotaMinRemaining() float64 {
+	val := a.getExtraFloat64("quota_min_remaining")
+	if val <= 0 {
+		return 0
+	}
+	return val
+}
+
+// GetQuotaMinRemainingRatio 获取停止调度的最小剩余额度比例阈值（0-1）。
+// 返回 0 表示未启用。
+func (a *Account) GetQuotaMinRemainingRatio() float64 {
+	val := a.getExtraFloat64("quota_min_remaining_ratio")
+	if val <= 0 || val >= 1 {
+		return 0
+	}
+	return val
+}
+
+// IsBelowQuotaSchedulingThreshold 检查总额度是否低于“停止调度”阈值。
+// 仅在配置了 quota_limit 且显式设置阈值时生效。
+func (a *Account) IsBelowQuotaSchedulingThreshold() bool {
+	limit := a.GetQuotaLimit()
+	if limit <= 0 {
+		return false
+	}
+
+	remaining := a.GetQuotaRemaining()
+	if remaining <= 0 {
+		return true
+	}
+
+	if minRemaining := a.GetQuotaMinRemaining(); minRemaining > 0 && remaining <= minRemaining {
+		return true
+	}
+
+	if minRatio := a.GetQuotaMinRemainingRatio(); minRatio > 0 {
+		remainingRatio := remaining / limit
+		if remainingRatio <= minRatio {
+			return true
+		}
+	}
+
+	return false
 }
 
 // GetQuotaDailyLimit 获取日额度限制（美元），0 表示未启用

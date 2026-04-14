@@ -82,7 +82,9 @@ const error = ref('')
 const success = ref(false)
 const hint = ref(t('payment.stripePopup.redirecting'))
 
-let pollTimer: ReturnType<typeof setInterval> | null = null
+let pollTimer: ReturnType<typeof setTimeout> | null = null
+const POLL_INTERVALS_MS = [3000, 5000, 8000, 15000] as const
+let pollAttempt = 0
 
 function closeWindow() { window.close() }
 
@@ -107,7 +109,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer)
+  if (pollTimer) clearTimeout(pollTimer)
 })
 
 async function initStripe(clientSecret: string, publishableKey: string) {
@@ -139,6 +141,7 @@ async function initStripe(clientSecret: string, publishableKey: string) {
         setTimeout(closeWindow, 2000)
       } else {
         // Payment not completed (user closed QR dialog)
+        pollAttempt = 0
         startPolling()
       }
     }
@@ -148,7 +151,9 @@ async function initStripe(clientSecret: string, publishableKey: string) {
 }
 
 function startPolling() {
-  pollTimer = setInterval(async () => {
+  const delay = POLL_INTERVALS_MS[Math.min(pollAttempt, POLL_INTERVALS_MS.length - 1)]
+  pollTimer = setTimeout(async () => {
+    pollTimer = null
     try {
       const token = document.cookie.split('; ').find(c => c.startsWith('token='))?.split('=')[1]
         || localStorage.getItem('token') || ''
@@ -160,11 +165,13 @@ function startPolling() {
       const data = await res.json()
       const status = data?.data?.status
       if (status === 'COMPLETED' || status === 'PAID') {
-        if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
         success.value = true
         setTimeout(closeWindow, 2000)
+        return
       }
     } catch { /* ignore */ }
-  }, 3000)
+    pollAttempt += 1
+    startPolling()
+  }, delay)
 }
 </script>

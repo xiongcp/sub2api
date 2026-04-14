@@ -10,6 +10,8 @@ const props = withDefaults(defineProps<{
   totalLimit: number | null
   dailyLimit: number | null
   weeklyLimit: number | null
+  minRemaining: number | null
+  minRemainingRatio: number | null
   dailyResetMode: QuotaResetMode | null
   dailyResetHour: number | null
   weeklyResetMode: QuotaResetMode | null
@@ -43,6 +45,8 @@ const emit = defineEmits<{
   'update:totalLimit': [value: number | null]
   'update:dailyLimit': [value: number | null]
   'update:weeklyLimit': [value: number | null]
+  'update:minRemaining': [value: number | null]
+  'update:minRemainingRatio': [value: number | null]
   'update:dailyResetMode': [value: QuotaResetMode | null]
   'update:dailyResetHour': [value: number | null]
   'update:weeklyResetMode': [value: QuotaResetMode | null]
@@ -81,6 +85,8 @@ watch(localEnabled, (val) => {
     emit('update:totalLimit', null)
     emit('update:dailyLimit', null)
     emit('update:weeklyLimit', null)
+    emit('update:minRemaining', null)
+    emit('update:minRemainingRatio', null)
     emit('update:dailyResetMode', null)
     emit('update:dailyResetHour', null)
     emit('update:weeklyResetMode', null)
@@ -121,6 +127,14 @@ const weeklyFixedHint = computed(() => {
     timezone: props.resetTimezone || 'UTC',
   })
 })
+const onMinRemainingInput = (e: Event) => {
+  const raw = (e.target as HTMLInputElement).valueAsNumber
+  emit('update:minRemaining', Number.isNaN(raw) ? null : raw)
+}
+const onMinRemainingRatioInput = (e: Event) => {
+  const raw = (e.target as HTMLInputElement).valueAsNumber
+  emit('update:minRemainingRatio', Number.isNaN(raw) ? null : raw)
+}
 
 const dailyFixedHint = computed(() =>
   t('admin.accounts.quotaDailyLimitHintFixed', {
@@ -241,6 +255,41 @@ const dailyFixedHint = computed(() =>
           @update:notify-threshold="emit('update:quotaNotifyTotalThreshold', $event)"
           @update:notify-threshold-type="emit('update:quotaNotifyTotalThresholdType', $event)"
         />
+
+        <div>
+          <label class="input-label">{{ t('admin.accounts.quotaMinRemaining') }}</label>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">$</span>
+            <input
+              :value="minRemaining"
+              @input="onMinRemainingInput"
+              type="number"
+              min="0"
+              step="0.01"
+              class="input pl-7"
+              :placeholder="t('admin.accounts.quotaMinRemainingPlaceholder')"
+            />
+          </div>
+          <p class="input-hint">{{ t('admin.accounts.quotaMinRemainingHint') }}</p>
+        </div>
+
+        <div>
+          <label class="input-label">{{ t('admin.accounts.quotaMinRemainingRatio') }}</label>
+          <div class="relative">
+            <input
+              :value="minRemainingRatio"
+              @input="onMinRemainingRatioInput"
+              type="number"
+              min="0"
+              max="0.99"
+              step="0.01"
+              class="input pr-12"
+              :placeholder="t('admin.accounts.quotaMinRemainingRatioPlaceholder')"
+            />
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">0-1</span>
+          </div>
+          <p class="input-hint">{{ t('admin.accounts.quotaMinRemainingRatioHint') }}</p>
+        </div>
       </div>
   </div>
 </template>

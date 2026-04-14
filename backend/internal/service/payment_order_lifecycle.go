@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
@@ -13,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 	"github.com/Wei-Shaw/sub2api/internal/payment/provider"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	gocache "github.com/patrickmn/go-cache"
 )
 
 // --- Cancel & Expire ---
@@ -193,6 +195,16 @@ func (s *PaymentService) VerifyOrderByOutTradeNo(ctx context.Context, outTradeNo
 // VerifyOrderPublic verifies payment status without user authentication.
 // Used by the payment result page when the user's session has expired.
 func (s *PaymentService) VerifyOrderPublic(ctx context.Context, outTradeNo string) (*dbent.PaymentOrder, error) {
+	cacheKey := strings.TrimSpace(outTradeNo)
+	if cacheKey != "" && s.publicVerifyCache != nil {
+		if cached, ok := s.publicVerifyCache.Get(cacheKey); ok {
+			if order, ok := cached.(dbent.PaymentOrder); ok {
+				orderCopy := order
+				return &orderCopy, nil
+			}
+		}
+	}
+
 	o, err := s.entClient.PaymentOrder.Query().
 		Where(paymentorder.OutTradeNo(outTradeNo)).
 		Only(ctx)
@@ -207,6 +219,9 @@ func (s *PaymentService) VerifyOrderPublic(ctx context.Context, outTradeNo strin
 				return nil, fmt.Errorf("reload order: %w", err)
 			}
 		}
+	}
+	if cacheKey != "" && s.publicVerifyCache != nil {
+		s.publicVerifyCache.Set(cacheKey, *o, gocache.DefaultExpiration)
 	}
 	return o, nil
 }
