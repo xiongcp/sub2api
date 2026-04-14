@@ -20,7 +20,15 @@ if (typeof globalThis.cancelIdleCallback === 'undefined') {
 
 // Mock IntersectionObserver
 class MockIntersectionObserver {
-  observe = vi.fn()
+  private callback: IntersectionObserverCallback
+
+  constructor(callback: IntersectionObserverCallback) {
+    this.callback = callback
+  }
+
+  observe = vi.fn((target: Element) => {
+    this.callback([{ isIntersecting: true, target } as IntersectionObserverEntry], this as unknown as IntersectionObserver)
+  })
   disconnect = vi.fn()
   unobserve = vi.fn()
 }
@@ -35,6 +43,22 @@ class MockResizeObserver {
 }
 
 globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver
+
+if (typeof window !== 'undefined' && typeof window.matchMedia === 'undefined') {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+}
 
 // Vue Test Utils 全局配置
 config.global.stubs = {
