@@ -1,5 +1,5 @@
 ## Goal
-- 将当前 `main` 上已合并 upstream 的代码与本地业务改动发布为 `0.1.113-rc1`，重点回归计费与模型映射，随后提交、推分支、打 tag，并推送 `chengpengxiong/sub2api` 镜像。
+- 为现有白牌 HTML/CSS 能力补充一套默认的 Google 风极简配置，并让新部署、缺失 key 补齐、后台“恢复默认”三条链路保持一致。
 
 ## Todo
 - 无。
@@ -8,50 +8,25 @@
 - 无。
 
 ## Done
-- 创建备份分支 `backup/main-pre-upstream-20260414`。
-- 导出补丁 `../sub2api-pre-upstream-20260414.patch`。
-- stash 当前工作区改动 `pre-upstream-merge-20260414`。
-- 新增 `upstream` 远端并拉取官方 `main`。
-- 创建临时集成分支 `merge/upstream-main-20260414`。
-- 将 `upstream/main` 合并到临时集成分支。
-- 清理 `packageManager` 等环境副作用。
-- 适配 upstream 合并后的后端/前端测试基线。
-- 将临时集成分支 fast-forward 回本地 `main`。
-- 回放原工作区 stash，并解决 `AccountCapacityCell.vue`、`CreateAccountModal.vue`、`EditAccountModal.vue`、`QuotaLimitCard.vue` 四个冲突文件。
-- 确认 Docker 本地环境可用，当前已登录 Docker Hub 用户 `chengpengxiong`。
-- 将版本号提升到 `0.1.113-rc1`。
-- 执行后端主干回归、前端静态检查、Vitest、专项计费/模型映射测试和整仓构建。
-- 提交发布提交 `e1c94aee chore(release): prepare 0.1.113-rc1`。
-- 推送 `origin/main` 并创建、推送标签 `v0.1.113-rc1`。
-- 构建镜像 `chengpengxiong/sub2api:0.1.113-rc1`，本地 smoke 通过。
-- 推送 Docker Hub 镜像 `chengpengxiong/sub2api:0.1.113-rc1` 与 `chengpengxiong/sub2api:latest`。
+- 后端新增 Google 风默认白牌模板常量，覆盖 `home_content`、`custom_css`、`login_extra_html`、`register_extra_html`、`global_footer_html`，并保持 `payment_footer_html` 默认为空。
+- `InitializeDefaultSettings` 改为“只补齐缺失 key，不覆盖已有值”，显式空字符串视为管理员有意清空，不自动回填。
+- `ProvideSettingService` 启动时会执行默认 setting 补齐，确保默认白牌模板真正落库，而不是只存在于代码里。
+- 后台“恢复默认”按钮改为恢复这套默认模板，并把首页 `home_content` 一起纳入恢复范围。
+- 认证布局补了稳定 class，默认 CSS 只对首页和认证布局生效，避免粗暴影响后台页面。
+- 新增后端初始化测试和前端默认模板测试。
 
 ## Validation
-- 已执行：
-- `cd backend && go test ./cmd/server ./internal/server/routes ./internal/handler/... ./internal/service/...`
-- `cd backend && go test ./internal/service/...`
-- `cd frontend && ./node_modules/.bin/eslint src/views src/components src/api src/composables src/utils src/i18n src/types --ext .ts,.vue`
-- `cd frontend && ./node_modules/.bin/vue-tsc --noEmit`
-- `cd frontend && ./node_modules/.bin/vitest run`
-- `cd backend && go test -count=1 ./cmd/server ./internal/server/routes ./internal/handler/... ./internal/service/... ./internal/repository/...`
-- `cd frontend && pnpm lint`
-- `cd frontend && pnpm typecheck`
-- `cd frontend && pnpm test:run`
-- `cd backend && go test -count=1 -run 'Test(OpenAIGatewayServiceRecordUsage|ResolveAccountStatsCost|CalculateCostUnified|UsageLogRepository)' ./internal/service ./internal/repository`
-- `make build`
 - `git diff --check`
-- `docker build -f Dockerfile -t chengpengxiong/sub2api:0.1.113-rc1 --build-arg VERSION=0.1.113-rc1 --build-arg COMMIT=e1c94aee --build-arg DATE=2026-04-14T14:28:15Z --build-arg GOPROXY=https://goproxy.cn,direct --build-arg GOSUMDB=sum.golang.google.cn .`
-- 分步 smoke：Postgres + Redis + `chengpengxiong/sub2api:0.1.113-rc1` 启动后，`curl http://127.0.0.1:38080/health` 返回 `{"status":"ok"}`。
-- Docker Hub 推送结果：
-- `chengpengxiong/sub2api:0.1.113-rc1` digest `sha256:4664ed97f9a6de2bed73fc868d75e0b27997b97e96d3339fb67797d4642b3b91`
-- `chengpengxiong/sub2api:latest` digest `sha256:4664ed97f9a6de2bed73fc868d75e0b27997b97e96d3339fb67797d4642b3b91`
+- `gofmt -w backend/internal/service/branding_defaults.go backend/internal/service/setting_service.go backend/internal/service/wire.go backend/cmd/server/wire_gen.go backend/internal/service/setting_service_initialize_test.go`
+- `cd backend && go test ./internal/service/... ./internal/server/... ./cmd/server/...`
+- `pnpm --dir frontend test:run`
+- `pnpm --dir frontend typecheck`
+- `pnpm --dir frontend lint:check`
 
 ## Risks
-- 当前仓库唯一未跟踪项是本地环境下的 `AGENTS.md`，未纳入提交。
-- `stash@{0}` 仍保留，作为额外回退保险；如果后续确认不需要，可手动删除。
-- upstream 主线引入的大量迁移、支付、通知、WebSearch 变更已落入本地 `main`，后续继续开发时应基于这些新结构继续改动。
-- 这次会把 `0.1.113-rc1` 同时推成 `latest`，默认拉取 `latest` 的环境会直接拿到 RC 镜像。
+- 默认首页采用完整 `home_content` 整页替换，后续如果首页产品结构再改，这套默认模板需要同步维护。
+- 这套默认风格接近 Google 的极简视觉，但仍需避免后续运营内容直接使用 Google 商标、Logo 或官方品牌素材。
+- `custom_css` 仍是全局注入，虽然本次已尽量收敛到首页/认证布局选择器，但后续自定义样式仍可能影响未验证页面。
 
 ## Next Steps
-- 在线上环境验证一条真实计费请求和一条真实模型映射请求，确认 usage、额度、费用三处口径一致。
-- 视需要删除 `stash@{0}` 与临时集成分支 `merge/upstream-main-20260414`。
+- 如果要继续做品牌模板能力，下一步更适合抽成后台“一键套用模板”，而不是继续在前端手写多个默认字符串副本。

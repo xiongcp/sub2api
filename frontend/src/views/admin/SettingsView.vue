@@ -2197,6 +2197,96 @@
               </p>
             </div>
 
+            <!-- Branding Slots -->
+            <div class="space-y-4 border-t border-gray-100 pt-4 dark:border-dark-700">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h3 class="text-sm font-medium text-gray-900 dark:text-white">
+                    {{ t('admin.settings.site.brandingSlotsTitle') }}
+                  </h3>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('admin.settings.site.brandingSlotsDescription') }}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm whitespace-nowrap"
+                  @click="resetBrandingSlots"
+                >
+                  {{ t('admin.settings.site.resetBrandingSlots') }}
+                </button>
+              </div>
+
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.site.customCss') }}
+                </label>
+                <textarea
+                  v-model="form.custom_css"
+                  rows="8"
+                  class="input font-mono text-sm"
+                  :placeholder="t('admin.settings.site.customCssPlaceholder')"
+                ></textarea>
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.site.customCssHint') }}
+                </p>
+              </div>
+
+              <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <div>
+                  <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('admin.settings.site.loginExtraHtml') }}
+                  </label>
+                  <textarea
+                    v-model="form.login_extra_html"
+                    rows="6"
+                    class="input font-mono text-sm"
+                    :placeholder="t('admin.settings.site.extraHtmlPlaceholder')"
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('admin.settings.site.registerExtraHtml') }}
+                  </label>
+                  <textarea
+                    v-model="form.register_extra_html"
+                    rows="6"
+                    class="input font-mono text-sm"
+                    :placeholder="t('admin.settings.site.extraHtmlPlaceholder')"
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('admin.settings.site.paymentFooterHtml') }}
+                  </label>
+                  <textarea
+                    v-model="form.payment_footer_html"
+                    rows="6"
+                    class="input font-mono text-sm"
+                    :placeholder="t('admin.settings.site.extraHtmlPlaceholder')"
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('admin.settings.site.globalFooterHtml') }}
+                  </label>
+                  <textarea
+                    v-model="form.global_footer_html"
+                    rows="6"
+                    class="input font-mono text-sm"
+                    :placeholder="t('admin.settings.site.extraHtmlPlaceholder')"
+                  ></textarea>
+                </div>
+              </div>
+
+              <p class="text-xs text-amber-600 dark:text-amber-400">
+                {{ t('admin.settings.site.brandingSlotsWarning') }}
+              </p>
+            </div>
+
             <!-- Hide CCS Import Button -->
             <div
               class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
@@ -2836,6 +2926,13 @@ import ImageUpload from '@/components/common/ImageUpload.vue'
 import BackupSettings from '@/views/admin/BackupView.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { extractApiErrorMessage } from '@/utils/apiError'
+import {
+  DEFAULT_BRANDING_CUSTOM_CSS,
+  DEFAULT_BRANDING_GLOBAL_FOOTER_HTML,
+  DEFAULT_BRANDING_HOME_CONTENT,
+  DEFAULT_BRANDING_LOGIN_EXTRA_HTML,
+  DEFAULT_BRANDING_REGISTER_EXTRA_HTML,
+} from '@/constants/defaultBranding'
 import { useAppStore } from '@/stores'
 import { useAdminSettingsStore } from '@/stores/adminSettings'
 import {
@@ -2966,6 +3063,11 @@ const form = reactive<SettingsForm>({
   contact_info: '',
   doc_url: '',
   home_content: '',
+  custom_css: '',
+  login_extra_html: '',
+  register_extra_html: '',
+  payment_footer_html: '',
+  global_footer_html: '',
   backend_mode_enabled: false,
   hide_ccs_import_button: false,
   payment_enabled: false,  payment_min_amount: 1,  payment_max_amount: 10000,  payment_daily_limit: 50000,  payment_max_pending_orders: 3,  payment_order_timeout_minutes: 30,  payment_balance_disabled: false,  payment_enabled_types: [],  payment_help_image_url: '',  payment_help_text: '',  payment_product_name_prefix: '',  payment_product_name_suffix: '',  payment_load_balance_strategy: 'round-robin',  payment_cancel_rate_limit_enabled: false,  payment_cancel_rate_limit_max: 10,  payment_cancel_rate_limit_window: 1,  payment_cancel_rate_limit_unit: 'day',  payment_cancel_rate_limit_window_mode: 'rolling',
@@ -3372,6 +3474,15 @@ function removeEndpoint(index: number) {
   form.custom_endpoints.splice(index, 1)
 }
 
+function resetBrandingSlots() {
+  form.home_content = DEFAULT_BRANDING_HOME_CONTENT
+  form.custom_css = DEFAULT_BRANDING_CUSTOM_CSS
+  form.login_extra_html = DEFAULT_BRANDING_LOGIN_EXTRA_HTML
+  form.register_extra_html = DEFAULT_BRANDING_REGISTER_EXTRA_HTML
+  form.payment_footer_html = ''
+  form.global_footer_html = DEFAULT_BRANDING_GLOBAL_FOOTER_HTML
+}
+
 function formatTablePageSizeOptions(options: number[]): string {
   return options.join(', ')
 }
@@ -3563,6 +3674,11 @@ async function saveSettings() {
       contact_info: form.contact_info,
       doc_url: form.doc_url,
       home_content: form.home_content,
+      custom_css: form.custom_css,
+      login_extra_html: form.login_extra_html,
+      register_extra_html: form.register_extra_html,
+      payment_footer_html: form.payment_footer_html,
+      global_footer_html: form.global_footer_html,
       backend_mode_enabled: form.backend_mode_enabled,
       hide_ccs_import_button: form.hide_ccs_import_button,
       table_default_page_size: form.table_default_page_size,

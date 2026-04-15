@@ -11,6 +11,11 @@
         </p>
       </div>
 
+      <TrustedHtmlBlock
+        class="prose prose-sm max-w-none rounded-xl border border-gray-200 bg-gray-50 p-4 text-gray-600 dark:prose-invert dark:border-dark-700 dark:bg-dark-800/60 dark:text-dark-300"
+        :content="registerExtraHtml"
+      />
+
       <div v-if="linuxdoOAuthEnabled || oidcOAuthEnabled" class="space-y-4">
         <LinuxDoOAuthSection
           v-if="linuxdoOAuthEnabled"
@@ -306,6 +311,7 @@ import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AuthLayout } from '@/components/layout'
+import TrustedHtmlBlock from '@/components/common/TrustedHtmlBlock.vue'
 import LinuxDoOAuthSection from '@/components/auth/LinuxDoOAuthSection.vue'
 import OidcOAuthSection from '@/components/auth/OidcOAuthSection.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -346,6 +352,7 @@ const linuxdoOAuthEnabled = ref<boolean>(false)
 const oidcOAuthEnabled = ref<boolean>(false)
 const oidcOAuthProviderName = ref<string>('OIDC')
 const registrationEmailSuffixWhitelist = ref<string[]>([])
+const registerExtraHtml = ref<string>('')
 
 // Turnstile
 const turnstileRef = ref<InstanceType<typeof TurnstileWidget> | null>(null)
@@ -399,6 +406,7 @@ onMounted(async () => {
     linuxdoOAuthEnabled.value = settings.linuxdo_oauth_enabled
     oidcOAuthEnabled.value = settings.oidc_oauth_enabled
     oidcOAuthProviderName.value = settings.oidc_oauth_provider_name || 'OIDC'
+    registerExtraHtml.value = settings.register_extra_html || ''
     registrationEmailSuffixWhitelist.value = normalizeRegistrationEmailSuffixWhitelist(
       settings.registration_email_suffix_whitelist || []
     )

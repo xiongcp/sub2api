@@ -223,6 +223,12 @@
             <p v-if="checkout.help_text" class="text-center text-sm text-gray-500 dark:text-gray-400">{{ checkout.help_text }}</p>
           </div>
         </div>
+        <div v-if="paymentFooterHtml && paymentPhase === 'select' && !selectedPlan" class="card p-4">
+          <TrustedHtmlBlock
+            class="prose prose-sm max-w-none text-gray-600 dark:prose-invert dark:text-dark-300"
+            :content="paymentFooterHtml"
+          />
+        </div>
       </template>
     </div>
     <!-- Renewal Plan Selection Modal -->
@@ -273,6 +279,7 @@ import { platformAccentBarClass, platformBadgeLightClass, platformBadgeClass, pl
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
 import StripePaymentInline from '@/components/payment/StripePaymentInline.vue'
+import TrustedHtmlBlock from '@/components/common/TrustedHtmlBlock.vue'
 import Icon from '@/components/icons/Icon.vue'
 import type { PaymentMethodOption } from '@/components/payment/PaymentMethodSelector.vue'
 
@@ -285,6 +292,7 @@ const appStore = useAppStore()
 
 const user = computed(() => authStore.user)
 const activeSubscriptions = computed(() => subscriptionStore.activeSubscriptions)
+const paymentFooterHtml = computed(() => appStore.cachedPublicSettings?.payment_footer_html || '')
 
 function getDaysRemaining(expiresAt: string): number {
   const diff = new Date(expiresAt).getTime() - Date.now()
@@ -595,7 +603,11 @@ async function createOrder(orderAmount: number, orderType: string, planId?: numb
 
 onMounted(async () => {
   try {
-    const res = await paymentAPI.getCheckoutInfo()
+    const [checkoutResult] = await Promise.all([
+      paymentAPI.getCheckoutInfo(),
+      appStore.publicSettingsLoaded ? Promise.resolve() : appStore.fetchPublicSettings().catch(() => undefined),
+    ])
+    const res = checkoutResult
     checkout.value = res.data
     if (enabledMethods.value.length) {
       const order: readonly string[] = METHOD_ORDER

@@ -116,6 +116,11 @@ export interface PublicSettings {
   contact_info: string
   doc_url: string
   home_content: string
+  custom_css: string
+  login_extra_html: string
+  register_extra_html: string
+  payment_footer_html: string
+  global_footer_html: string
   hide_ccs_import_button: boolean
   payment_enabled: boolean
   table_default_page_size: number

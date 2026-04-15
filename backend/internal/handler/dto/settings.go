@@ -81,6 +81,11 @@ type SystemSettings struct {
 	ContactInfo                 string           `json:"contact_info"`
 	DocURL                      string           `json:"doc_url"`
 	HomeContent                 string           `json:"home_content"`
+	CustomCSS                   string           `json:"custom_css"`
+	LoginExtraHTML              string           `json:"login_extra_html"`
+	RegisterExtraHTML           string           `json:"register_extra_html"`
+	PaymentFooterHTML           string           `json:"payment_footer_html"`
+	GlobalFooterHTML            string           `json:"global_footer_html"`
 	HideCcsImportButton         bool             `json:"hide_ccs_import_button"`
 	PurchaseSubscriptionEnabled bool             `json:"purchase_subscription_enabled"`
 	PurchaseSubscriptionURL     string           `json:"purchase_subscription_url"`
@@ -179,6 +184,11 @@ type PublicSettings struct {
 	ContactInfo                      string           `json:"contact_info"`
 	DocURL                           string           `json:"doc_url"`
 	HomeContent                      string           `json:"home_content"`
+	CustomCSS                        string           `json:"custom_css"`
+	LoginExtraHTML                   string           `json:"login_extra_html"`
+	RegisterExtraHTML                string           `json:"register_extra_html"`
+	PaymentFooterHTML                string           `json:"payment_footer_html"`
+	GlobalFooterHTML                 string           `json:"global_footer_html"`
 	HideCcsImportButton              bool             `json:"hide_ccs_import_button"`
 	PurchaseSubscriptionEnabled      bool             `json:"purchase_subscription_enabled"`
 	PurchaseSubscriptionURL          string           `json:"purchase_subscription_url"`

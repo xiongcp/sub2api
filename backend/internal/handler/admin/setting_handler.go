@@ -146,6 +146,11 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		ContactInfo:                          settings.ContactInfo,
 		DocURL:                               settings.DocURL,
 		HomeContent:                          settings.HomeContent,
+		CustomCSS:                            settings.CustomCSS,
+		LoginExtraHTML:                       settings.LoginExtraHTML,
+		RegisterExtraHTML:                    settings.RegisterExtraHTML,
+		PaymentFooterHTML:                    settings.PaymentFooterHTML,
+		GlobalFooterHTML:                     settings.GlobalFooterHTML,
 		HideCcsImportButton:                  settings.HideCcsImportButton,
 		PurchaseSubscriptionEnabled:          settings.PurchaseSubscriptionEnabled,
 		PurchaseSubscriptionURL:              settings.PurchaseSubscriptionURL,
@@ -265,6 +270,11 @@ type UpdateSettingsRequest struct {
 	ContactInfo                 string                `json:"contact_info"`
 	DocURL                      string                `json:"doc_url"`
 	HomeContent                 string                `json:"home_content"`
+	CustomCSS                   string                `json:"custom_css"`
+	LoginExtraHTML              string                `json:"login_extra_html"`
+	RegisterExtraHTML           string                `json:"register_extra_html"`
+	PaymentFooterHTML           string                `json:"payment_footer_html"`
+	GlobalFooterHTML            string                `json:"global_footer_html"`
 	HideCcsImportButton         bool                  `json:"hide_ccs_import_button"`
 	PurchaseSubscriptionEnabled *bool                 `json:"purchase_subscription_enabled"`
 	PurchaseSubscriptionURL     *string               `json:"purchase_subscription_url"`
@@ -830,6 +840,11 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		ContactInfo:                      req.ContactInfo,
 		DocURL:                           req.DocURL,
 		HomeContent:                      req.HomeContent,
+		CustomCSS:                        req.CustomCSS,
+		LoginExtraHTML:                   req.LoginExtraHTML,
+		RegisterExtraHTML:                req.RegisterExtraHTML,
+		PaymentFooterHTML:                req.PaymentFooterHTML,
+		GlobalFooterHTML:                 req.GlobalFooterHTML,
 		HideCcsImportButton:              req.HideCcsImportButton,
 		PurchaseSubscriptionEnabled:      purchaseEnabled,
 		PurchaseSubscriptionURL:          purchaseURL,
@@ -1041,6 +1056,11 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		ContactInfo:                          updatedSettings.ContactInfo,
 		DocURL:                               updatedSettings.DocURL,
 		HomeContent:                          updatedSettings.HomeContent,
+		CustomCSS:                            updatedSettings.CustomCSS,
+		LoginExtraHTML:                       updatedSettings.LoginExtraHTML,
+		RegisterExtraHTML:                    updatedSettings.RegisterExtraHTML,
+		PaymentFooterHTML:                    updatedSettings.PaymentFooterHTML,
+		GlobalFooterHTML:                     updatedSettings.GlobalFooterHTML,
 		HideCcsImportButton:                  updatedSettings.HideCcsImportButton,
 		PurchaseSubscriptionEnabled:          updatedSettings.PurchaseSubscriptionEnabled,
 		PurchaseSubscriptionURL:              updatedSettings.PurchaseSubscriptionURL,
@@ -1282,6 +1302,21 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	}
 	if before.HomeContent != after.HomeContent {
 		changed = append(changed, "home_content")
+	}
+	if before.CustomCSS != after.CustomCSS {
+		changed = append(changed, "custom_css")
+	}
+	if before.LoginExtraHTML != after.LoginExtraHTML {
+		changed = append(changed, "login_extra_html")
+	}
+	if before.RegisterExtraHTML != after.RegisterExtraHTML {
+		changed = append(changed, "register_extra_html")
+	}
+	if before.PaymentFooterHTML != after.PaymentFooterHTML {
+		changed = append(changed, "payment_footer_html")
+	}
+	if before.GlobalFooterHTML != after.GlobalFooterHTML {
+		changed = append(changed, "global_footer_html")
 	}
 	if before.HideCcsImportButton != after.HideCcsImportButton {
 		changed = append(changed, "hide_ccs_import_button")

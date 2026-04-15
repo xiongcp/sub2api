@@ -63,6 +63,11 @@ type SystemSettings struct {
 	ContactInfo                 string
 	DocURL                      string
 	HomeContent                 string
+	CustomCSS                   string
+	LoginExtraHTML              string
+	RegisterExtraHTML           string
+	PaymentFooterHTML           string
+	GlobalFooterHTML            string
 	HideCcsImportButton         bool
 	PurchaseSubscriptionEnabled bool
 	PurchaseSubscriptionURL     string
@@ -142,6 +147,11 @@ type PublicSettings struct {
 	ContactInfo                      string
 	DocURL                           string
 	HomeContent                      string
+	CustomCSS                        string
+	LoginExtraHTML                   string
+	RegisterExtraHTML                string
+	PaymentFooterHTML                string
+	GlobalFooterHTML                 string
 	HideCcsImportButton              bool
 
 	PurchaseSubscriptionEnabled bool

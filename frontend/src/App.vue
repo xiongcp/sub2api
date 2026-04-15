@@ -7,6 +7,7 @@ import { resolveDocumentTitle } from '@/router/title'
 import AnnouncementPopup from '@/components/common/AnnouncementPopup.vue'
 import { useAppStore, useAuthStore, useSubscriptionStore, useAnnouncementStore } from '@/stores'
 import { getSetupStatus } from '@/api/setup'
+import { upsertCustomCss } from '@/utils/customCss'
 
 const router = useRouter()
 const route = useRoute()
@@ -38,6 +39,14 @@ watch(
     if (newLogo) {
       updateFavicon(newLogo)
     }
+  },
+  { immediate: true }
+)
+
+watch(
+  () => appStore.cachedPublicSettings?.custom_css || '',
+  (css) => {
+    upsertCustomCss(css)
   },
   { immediate: true }
 )

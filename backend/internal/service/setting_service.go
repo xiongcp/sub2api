@@ -170,6 +170,11 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyContactInfo,
 		SettingKeyDocURL,
 		SettingKeyHomeContent,
+		SettingKeyCustomCSS,
+		SettingKeyLoginExtraHTML,
+		SettingKeyRegisterExtraHTML,
+		SettingKeyPaymentFooterHTML,
+		SettingKeyGlobalFooterHTML,
 		SettingKeyHideCcsImportButton,
 		SettingKeyPurchaseSubscriptionEnabled,
 		SettingKeyPurchaseSubscriptionURL,
@@ -246,6 +251,11 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		ContactInfo:                      settings[SettingKeyContactInfo],
 		DocURL:                           settings[SettingKeyDocURL],
 		HomeContent:                      settings[SettingKeyHomeContent],
+		CustomCSS:                        settings[SettingKeyCustomCSS],
+		LoginExtraHTML:                   settings[SettingKeyLoginExtraHTML],
+		RegisterExtraHTML:                settings[SettingKeyRegisterExtraHTML],
+		PaymentFooterHTML:                settings[SettingKeyPaymentFooterHTML],
+		GlobalFooterHTML:                 settings[SettingKeyGlobalFooterHTML],
 		HideCcsImportButton:              settings[SettingKeyHideCcsImportButton] == "true",
 		PurchaseSubscriptionEnabled:      settings[SettingKeyPurchaseSubscriptionEnabled] == "true",
 		PurchaseSubscriptionURL:          strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL]),
@@ -302,6 +312,11 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		ContactInfo                      string          `json:"contact_info,omitempty"`
 		DocURL                           string          `json:"doc_url,omitempty"`
 		HomeContent                      string          `json:"home_content,omitempty"`
+		CustomCSS                        string          `json:"custom_css,omitempty"`
+		LoginExtraHTML                   string          `json:"login_extra_html,omitempty"`
+		RegisterExtraHTML                string          `json:"register_extra_html,omitempty"`
+		PaymentFooterHTML                string          `json:"payment_footer_html,omitempty"`
+		GlobalFooterHTML                 string          `json:"global_footer_html,omitempty"`
 		HideCcsImportButton              bool            `json:"hide_ccs_import_button"`
 		PurchaseSubscriptionEnabled      bool            `json:"purchase_subscription_enabled"`
 		PurchaseSubscriptionURL          string          `json:"purchase_subscription_url,omitempty"`
@@ -336,6 +351,11 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		ContactInfo:                      settings.ContactInfo,
 		DocURL:                           settings.DocURL,
 		HomeContent:                      settings.HomeContent,
+		CustomCSS:                        settings.CustomCSS,
+		LoginExtraHTML:                   settings.LoginExtraHTML,
+		RegisterExtraHTML:                settings.RegisterExtraHTML,
+		PaymentFooterHTML:                settings.PaymentFooterHTML,
+		GlobalFooterHTML:                 settings.GlobalFooterHTML,
 		HideCcsImportButton:              settings.HideCcsImportButton,
 		PurchaseSubscriptionEnabled:      settings.PurchaseSubscriptionEnabled,
 		PurchaseSubscriptionURL:          settings.PurchaseSubscriptionURL,
@@ -568,6 +588,11 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	updates[SettingKeyContactInfo] = settings.ContactInfo
 	updates[SettingKeyDocURL] = settings.DocURL
 	updates[SettingKeyHomeContent] = settings.HomeContent
+	updates[SettingKeyCustomCSS] = settings.CustomCSS
+	updates[SettingKeyLoginExtraHTML] = settings.LoginExtraHTML
+	updates[SettingKeyRegisterExtraHTML] = settings.RegisterExtraHTML
+	updates[SettingKeyPaymentFooterHTML] = settings.PaymentFooterHTML
+	updates[SettingKeyGlobalFooterHTML] = settings.GlobalFooterHTML
 	updates[SettingKeyHideCcsImportButton] = strconv.FormatBool(settings.HideCcsImportButton)
 	updates[SettingKeyPurchaseSubscriptionEnabled] = strconv.FormatBool(settings.PurchaseSubscriptionEnabled)
 	updates[SettingKeyPurchaseSubscriptionURL] = strings.TrimSpace(settings.PurchaseSubscriptionURL)
@@ -919,19 +944,14 @@ func (s *SettingService) GetDefaultSubscriptions(ctx context.Context) []DefaultS
 	return parseDefaultSubscriptions(value)
 }
 
-// InitializeDefaultSettings 初始化默认设置
+// InitializeDefaultSettings 初始化默认设置。
+// 仅补齐缺失的 key，不覆盖已有值；空字符串视为显式配置，不自动回填。
 func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
-	// 检查是否已有设置
-	_, err := s.settingRepo.GetValue(ctx, SettingKeyRegistrationEnabled)
-	if err == nil {
-		// 已有设置，不需要初始化
-		return nil
-	}
-	if !errors.Is(err, ErrSettingNotFound) {
-		return fmt.Errorf("check existing settings: %w", err)
+	existing, err := s.settingRepo.GetAll(ctx)
+	if err != nil {
+		return fmt.Errorf("get existing settings: %w", err)
 	}
 
-	// 初始化默认设置
 	defaults := map[string]string{
 		SettingKeyRegistrationEnabled:              "true",
 		SettingKeyEmailVerifyEnabled:               "false",
@@ -975,8 +995,21 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		// 分组隔离（默认不允许未分组 Key 调度）
 		SettingKeyAllowUngroupedKeyScheduling: "false",
 	}
+	for key, value := range defaultBrandingSettings() {
+		defaults[key] = value
+	}
 
-	return s.settingRepo.SetMultiple(ctx, defaults)
+	missing := make(map[string]string)
+	for key, value := range defaults {
+		if _, ok := existing[key]; !ok {
+			missing[key] = value
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+
+	return s.settingRepo.SetMultiple(ctx, missing)
 }
 
 // parseSettings 解析设置到结构体
@@ -1007,6 +1040,11 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		ContactInfo:                      settings[SettingKeyContactInfo],
 		DocURL:                           settings[SettingKeyDocURL],
 		HomeContent:                      settings[SettingKeyHomeContent],
+		CustomCSS:                        settings[SettingKeyCustomCSS],
+		LoginExtraHTML:                   settings[SettingKeyLoginExtraHTML],
+		RegisterExtraHTML:                settings[SettingKeyRegisterExtraHTML],
+		PaymentFooterHTML:                settings[SettingKeyPaymentFooterHTML],
+		GlobalFooterHTML:                 settings[SettingKeyGlobalFooterHTML],
 		HideCcsImportButton:              settings[SettingKeyHideCcsImportButton] == "true",
 		PurchaseSubscriptionEnabled:      settings[SettingKeyPurchaseSubscriptionEnabled] == "true",
 		PurchaseSubscriptionURL:          strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL]),

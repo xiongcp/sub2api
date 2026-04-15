@@ -223,3 +223,22 @@ func TestSettingService_UpdateSettings_TablePreferences(t *testing.T) {
 	require.Equal(t, "1000", repo.updates[SettingKeyTableDefaultPageSize])
 	require.Equal(t, "[20,100]", repo.updates[SettingKeyTablePageSizeOptions])
 }
+
+func TestSettingService_UpdateSettings_CustomBrandingSlots(t *testing.T) {
+	repo := &settingUpdateRepoStub{}
+	svc := NewSettingService(repo, &config.Config{})
+
+	err := svc.UpdateSettings(context.Background(), &SystemSettings{
+		CustomCSS:         "body { color: red; }",
+		LoginExtraHTML:    "<p>login</p>",
+		RegisterExtraHTML: "<p>register</p>",
+		PaymentFooterHTML: "<p>payment</p>",
+		GlobalFooterHTML:  "<p>footer</p>",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "body { color: red; }", repo.updates[SettingKeyCustomCSS])
+	require.Equal(t, "<p>login</p>", repo.updates[SettingKeyLoginExtraHTML])
+	require.Equal(t, "<p>register</p>", repo.updates[SettingKeyRegisterExtraHTML])
+	require.Equal(t, "<p>payment</p>", repo.updates[SettingKeyPaymentFooterHTML])
+	require.Equal(t, "<p>footer</p>", repo.updates[SettingKeyGlobalFooterHTML])
+}
