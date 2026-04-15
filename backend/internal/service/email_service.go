@@ -83,6 +83,11 @@ const (
 
 type SMTPSecurityMode string
 
+type smtpAuthAttempt struct {
+	mechanism string
+	auth      smtp.Auth
+}
+
 const (
 	SMTPSecurityModeStartTLS    SMTPSecurityMode = "starttls"
 	SMTPSecurityModeImplicitTLS SMTPSecurityMode = "implicit_tls"
@@ -263,6 +268,164 @@ func (s *EmailService) openSMTPClient(config *SMTPConfig) (*smtp.Client, func(),
 	}
 }
 
+func smtpAuthMechanisms(client *smtp.Client) []string {
+	if client == nil {
+		return nil
+	}
+	ok, authLine := client.Extension("AUTH")
+	if !ok {
+		return nil
+	}
+
+	fields := strings.Fields(strings.ToUpper(strings.TrimSpace(authLine)))
+	if len(fields) == 0 {
+		return nil
+	}
+
+	mechanisms := make([]string, 0, len(fields))
+	seen := make(map[string]struct{}, len(fields))
+	for _, field := range fields {
+		if _, exists := seen[field]; exists {
+			continue
+		}
+		seen[field] = struct{}{}
+		mechanisms = append(mechanisms, field)
+	}
+	return mechanisms
+}
+
+func buildSMTPAuthAttempts(client *smtp.Client, config *SMTPConfig) ([]smtpAuthAttempt, []string, error) {
+	mechanisms := smtpAuthMechanisms(client)
+	if len(mechanisms) == 0 {
+		return nil, nil, fmt.Errorf("smtp server does not advertise AUTH support")
+	}
+
+	available := make(map[string]struct{}, len(mechanisms))
+	for _, mechanism := range mechanisms {
+		available[mechanism] = struct{}{}
+	}
+
+	attempts := make([]smtpAuthAttempt, 0, 2)
+	if _, ok := available["PLAIN"]; ok {
+		attempts = append(attempts, smtpAuthAttempt{
+			mechanism: "PLAIN",
+			auth:      smtp.PlainAuth("", config.Username, config.Password, config.Host),
+		})
+	}
+	if _, ok := available["LOGIN"]; ok {
+		attempts = append(attempts, smtpAuthAttempt{
+			mechanism: "LOGIN",
+			auth:      newSMTPLoginAuth(config.Username, config.Password, config.Host, resolveSMTPSecurityMode(config) == SMTPSecurityModePlain),
+		})
+	}
+
+	if len(attempts) == 0 {
+		return nil, mechanisms, fmt.Errorf("server does not advertise a supported smtp auth mechanism (advertised: %s)", strings.Join(mechanisms, " "))
+	}
+
+	return attempts, mechanisms, nil
+}
+
+func (s *EmailService) openAuthenticatedSMTPClient(config *SMTPConfig) (*smtp.Client, func(), []string, error) {
+	client, cleanup, err := s.openSMTPClient(config)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if config.Username == "" && config.Password == "" {
+		return client, cleanup, nil, nil
+	}
+
+	attempts, _, err := buildSMTPAuthAttempts(client, config)
+	if err != nil {
+		cleanup()
+		return nil, nil, nil, err
+	}
+
+	for index, attempt := range attempts {
+		if index > 0 {
+			cleanup()
+			client, cleanup, err = s.openSMTPClient(config)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+		}
+
+		if err := client.Auth(attempt.auth); err != nil {
+			if index < len(attempts)-1 && isSMTPUnsupportedAuthError(err) {
+				continue
+			}
+			cleanup()
+			return nil, nil, nil, fmt.Errorf("smtp authentication failed using AUTH %s: %w", attempt.mechanism, err)
+		}
+		return client, cleanup, smtpAuthMechanisms(client), nil
+	}
+
+	cleanup()
+	return nil, nil, nil, fmt.Errorf("smtp authentication failed: no supported auth mechanism succeeded")
+}
+
+func isSMTPUnsupportedAuthError(err error) bool {
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "unrecognized authentication type") ||
+		strings.Contains(lower, "unsupported authentication mechanism") ||
+		strings.Contains(lower, "auth mechanism not supported") ||
+		strings.Contains(lower, "504 5.7.4")
+}
+
+type smtpLoginAuth struct {
+	username      string
+	password      string
+	host          string
+	allowInsecure bool
+	step          int
+}
+
+func newSMTPLoginAuth(username, password, host string, allowInsecure bool) smtp.Auth {
+	return &smtpLoginAuth{
+		username:      username,
+		password:      password,
+		host:          host,
+		allowInsecure: allowInsecure,
+	}
+}
+
+func (a *smtpLoginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
+	a.step = 0
+	if !server.TLS && !a.allowInsecure && !isLocalhostSMTPServerName(server.Name) && !isLocalhostSMTPServerName(a.host) {
+		return "", nil, fmt.Errorf("unencrypted connection")
+	}
+	return "LOGIN", nil, nil
+}
+
+func (a *smtpLoginAuth) Next(_ []byte, more bool) ([]byte, error) {
+	if !more {
+		return nil, nil
+	}
+	switch a.step {
+	case 0:
+		a.step++
+		return []byte(a.username), nil
+	case 1:
+		a.step++
+		return []byte(a.password), nil
+	default:
+		return nil, fmt.Errorf("unexpected server challenge during AUTH LOGIN")
+	}
+}
+
+func isLocalhostSMTPServerName(name string) bool {
+	host := strings.TrimSpace(strings.ToLower(name))
+	switch host {
+	case "localhost", "127.0.0.1", "::1":
+		return true
+	default:
+		return strings.HasPrefix(host, "127.")
+	}
+}
+
 // SendEmailWithConfig 使用指定配置发送邮件
 func (s *EmailService) SendEmailWithConfig(config *SMTPConfig, to, subject, body string) error {
 	// Sanitize all SMTP header fields to prevent header injection (CR/LF removal).
@@ -277,18 +440,11 @@ func (s *EmailService) SendEmailWithConfig(config *SMTPConfig, to, subject, body
 	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",
 		from, to, subject, body)
 
-	client, cleanup, err := s.openSMTPClient(config)
+	client, cleanup, _, err := s.openAuthenticatedSMTPClient(config)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
-
-	if config.Username != "" || config.Password != "" {
-		auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
-		if err := client.Auth(auth); err != nil {
-			return fmt.Errorf("smtp auth: %w", err)
-		}
-	}
 	if err := client.Mail(config.From); err != nil {
 		return fmt.Errorf("smtp mail: %w", err)
 	}
@@ -439,18 +595,14 @@ func (s *EmailService) buildVerifyCodeEmailBody(code, siteName string) string {
 
 // TestSMTPConnectionWithConfig 使用指定配置测试SMTP连接
 func (s *EmailService) TestSMTPConnectionWithConfig(config *SMTPConfig) error {
-	client, cleanup, err := s.openSMTPClient(config)
+	client, cleanup, mechanisms, err := s.openAuthenticatedSMTPClient(config)
+	if len(mechanisms) > 0 {
+		slog.Info("smtp connection test discovered auth mechanisms", "host", config.Host, "port", config.Port, "mechanisms", strings.Join(mechanisms, " "))
+	}
 	if err != nil {
 		return err
 	}
 	defer cleanup()
-
-	if config.Username != "" || config.Password != "" {
-		auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
-		if err := client.Auth(auth); err != nil {
-			return fmt.Errorf("smtp authentication failed: %w", err)
-		}
-	}
 
 	return client.Quit()
 }
