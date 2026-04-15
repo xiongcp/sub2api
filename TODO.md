@@ -1,4 +1,31 @@
 ## Goal
+- 优化默认 branding 的自定义 CSS 与辅助文案结构，在保持简洁风格的前提下强化 Google 风格的层级、节奏与品牌识别。
+
+## Todo
+- 无。
+
+## Doing
+- 无。
+
+## Done
+- 已将默认 branding 的首页品牌标识从单点阴影改为四色标记组合，并重写首页 badge、search shell、按钮、chips 与 footer 的视觉 token，强化 Google 风格但保留简洁结构。
+- 已调整认证页默认 branding 覆盖：弱化 glass 效果、收敛背景装饰、统一输入框与主按钮状态，并为登录/注册说明块新增 `marker + eyebrow` 结构。
+- 已同步更新 `frontend/src/constants/defaultBranding.ts` 与 `backend/internal/service/branding_defaults.go`，确保前端“恢复默认品牌”和后端初始化默认值保持一致。
+- 已补强 `frontend/src/constants/__tests__/defaultBranding.spec.ts`，新增对新 token 与新 HTML 结构的断言。
+
+## Validation
+- `git diff --check -- TODO.md frontend/src/constants/defaultBranding.ts frontend/src/constants/__tests__/defaultBranding.spec.ts backend/internal/service/branding_defaults.go`
+- `cd frontend && pnpm test:run src/constants/__tests__/defaultBranding.spec.ts`
+- `cd backend && go test -tags unit ./internal/service -run 'TestSettingService_InitializeDefaultSettings_(FillsMissingBrandingDefaults|PreservesExplicitEmptyBrandingValues)'`
+
+## Risks
+- 默认 branding 常量当前在前后端各维护一份，若不同步修改会导致“恢复默认品牌”前后不一致。
+- 工作区存在与本任务无关的现有变更：`frontend/package.json` 已被 Corepack 写入 `packageManager` 字段，本轮不应混入该改动。
+
+## Next Steps
+- 如需继续微调视觉效果，下一步应优先做登录页与首页的实际页面截图对比，再决定是否继续收紧色彩和间距。
+
+## Goal
 - 将 Cloudflare 控制台已开启的全局 Authenticated Origin Pulls（AOP）真正落地到源站 Nginx，要求源站只接受带 Cloudflare 共享客户端证书的 HTTPS 请求。
 
 ## Todo
