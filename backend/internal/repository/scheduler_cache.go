@@ -426,6 +426,14 @@ func filterSchedulerExtra(extra map[string]any) map[string]any {
 		"window_cost_sticky_reserve",
 		"max_sessions",
 		"session_idle_timeout_minutes",
+		// 调度阶段会直接基于快照账号判定 OpenAI WS 传输兼容性，这些键不能被裁掉。
+		"openai_oauth_responses_websockets_v2_mode",
+		"openai_oauth_responses_websockets_v2_enabled",
+		"openai_apikey_responses_websockets_v2_mode",
+		"openai_apikey_responses_websockets_v2_enabled",
+		"responses_websockets_v2_enabled",
+		"openai_ws_enabled",
+		"openai_ws_force_http",
 	}
 	filtered := make(map[string]any)
 	for _, key := range keys {

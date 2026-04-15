@@ -43,12 +43,19 @@ func TestSchedulerCacheSnapshotUsesSlimMetadataButKeepsFullAccount(t *testing.T)
 			"huge_blob":     strings.Repeat("x", 4096),
 		},
 		Extra: map[string]any{
-			"mixed_scheduling":             true,
-			"window_cost_limit":            12.5,
-			"window_cost_sticky_reserve":   8.0,
-			"max_sessions":                 4,
-			"session_idle_timeout_minutes": 11,
-			"unused_large_field":           strings.Repeat("y", 4096),
+			"mixed_scheduling":                              true,
+			"window_cost_limit":                             12.5,
+			"window_cost_sticky_reserve":                    8.0,
+			"max_sessions":                                  4,
+			"session_idle_timeout_minutes":                  11,
+			"openai_oauth_responses_websockets_v2_mode":     "passthrough",
+			"openai_oauth_responses_websockets_v2_enabled":  true,
+			"openai_apikey_responses_websockets_v2_mode":    "ctx_pool",
+			"openai_apikey_responses_websockets_v2_enabled": true,
+			"responses_websockets_v2_enabled":               true,
+			"openai_ws_enabled":                             true,
+			"openai_ws_force_http":                          true,
+			"unused_large_field":                            strings.Repeat("y", 4096),
 		},
 		RateLimitResetAt:       &limitReset,
 		OverloadUntil:          &overloadUntil,
@@ -78,6 +85,13 @@ func TestSchedulerCacheSnapshotUsesSlimMetadataButKeepsFullAccount(t *testing.T)
 	require.Equal(t, 8.0, got.GetWindowCostStickyReserve())
 	require.Equal(t, 4, got.GetMaxSessions())
 	require.Equal(t, 11, got.GetSessionIdleTimeoutMinutes())
+	require.Equal(t, "passthrough", got.Extra["openai_oauth_responses_websockets_v2_mode"])
+	require.Equal(t, true, got.Extra["openai_oauth_responses_websockets_v2_enabled"])
+	require.Equal(t, "ctx_pool", got.Extra["openai_apikey_responses_websockets_v2_mode"])
+	require.Equal(t, true, got.Extra["openai_apikey_responses_websockets_v2_enabled"])
+	require.Equal(t, true, got.Extra["responses_websockets_v2_enabled"])
+	require.Equal(t, true, got.Extra["openai_ws_enabled"])
+	require.Equal(t, true, got.Extra["openai_ws_force_http"])
 	require.Nil(t, got.Extra["unused_large_field"])
 
 	full, err := cache.GetAccount(ctx, account.ID)
