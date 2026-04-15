@@ -1,5 +1,5 @@
 ## Goal
-- 修复 scheduler cache 裁剪 `Account.Extra` 后丢失 OpenAI WS 能力字段，导致 `/openai/v1/responses` WebSocket 账号选择误判为不可用的问题。
+- 修复 SMTP 配置只区分 `smtp_use_tls` 的问题，支持 `STARTTLS` / 隐式 TLS / 明文三种模式，解决 Outlook 587 握手失败；保持旧配置兼容，并完成代码提交、推送与 Docker 镜像发布。
 
 ## Todo
 - 无。
@@ -8,20 +8,21 @@
 - 无。
 
 ## Done
-- 已确认问题存在：scheduler snapshot 只保留少量 `Extra` 字段，而 OpenAI WS 协议解析和 scheduler transport 过滤依赖 `openai_*_responses_websockets_v2_*`、`responses_websockets_v2_enabled`、`openai_ws_enabled`、`openai_ws_force_http`。
-- 已确认影响路径：`/openai/v1/responses` WebSocket 入口固定要求 `OpenAIUpstreamTransportResponsesWebsocketV2`，快照账号若丢失上述字段，会在账号选择阶段被错误过滤并报 `openai.websocket_account_select_failed`。
-- 已补齐 scheduler cache 的 OpenAI WS 传输判定白名单，保持瘦快照策略不变，只保留 scheduler 选择阶段真正依赖的 `Extra` 字段。
-- 已新增缓存层回归测试，确认快照会保留 OpenAI WS 所需字段，同时继续裁掉无关大字段。
-- 已新增 scheduler 回归测试，确认走 snapshot 账号列表时，带有 WSv2 元数据的账号仍可被选中，并最终返回 hydration 后的完整账号。
+- 已确认问题存在：当前 `smtp_use_tls=true` 会直接走隐式 TLS，连接 `smtp-mail.outlook.com:587` 时会报 `tls: first record does not look like a TLS handshake`。
+- 已确认根因：Outlook 587 端口要求明文建连后执行 `STARTTLS`，不是隐式 TLS；当前“测试连接”和“真实发信”两套逻辑也不一致，容易出现测试结果与实际发信不一致。
+- 已确定修复方案：增加 `smtp_security_mode` 显式安全模式，兼容旧字段 `smtp_use_tls`；统一 SMTP 拨号与认证逻辑；后台设置页改为显式模式选择，默认 `starttls`。
 
 ## Validation
 - `git diff --check`
-- `cd backend && go test ./internal/service/...`
-- `cd backend && go test -tags=integration ./internal/repository/... -run TestSchedulerCacheSnapshotUsesSlimMetadataButKeepsFullAccount`
+- `cd backend && go test ./internal/service/... ./internal/handler/... ./internal/server/...`
+- `cd frontend && pnpm lint`
+- `cd frontend && pnpm typecheck`
+- `docker build -t chengpengxiong/sub2api:v0.1.113-rc1-hotfix1 -t chengpengxiong/sub2api:latest .`
 
 ## Risks
-- 这是缓存快照问题，代码修复后如果线上继续命中旧 `sched:*` 快照，症状可能暂时还在；需要依赖重启后的 startup rebuild 或显式重建快照。
-- 本次保持瘦快照策略，只补 transport 判定必需字段；如果后续 scheduler 再依赖新的 `Extra` 键，需要同步维护白名单。
+- 线上已保存的老配置只有 `smtp_use_tls`，需要兼容映射，避免保存前后行为漂移。
+- 新镜像将按当前环境构建为单架构镜像；如果线上需要多架构发布，需要后续补齐 `buildx` / QEMU。
 
 ## Next Steps
-- 如果上线方式不是重启进程，需要补一条运维说明：发布后清理或重建 Redis 中的 scheduler snapshot。
+- 完成代码改造、测试、提交与推送。
+- 构建并推送 `chengpengxiong/sub2api:v0.1.113-rc1-hotfix1` 与 `chengpengxiong/sub2api:latest`。

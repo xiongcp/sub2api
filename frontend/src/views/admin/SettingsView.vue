@@ -2642,7 +2642,7 @@
                   min="1"
                   max="65535"
                   class="input"
-                  :placeholder="t('admin.settings.smtp.portPlaceholder')"
+                  :placeholder="smtpPortPlaceholder"
                 />
               </div>
               <div>
@@ -2707,19 +2707,22 @@
               </div>
             </div>
 
-            <!-- Use TLS Toggle -->
-            <div
-              class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
-            >
-              <div>
-                <label class="font-medium text-gray-900 dark:text-white">{{
-                  t('admin.settings.smtp.useTls')
-                }}</label>
-                <p class="text-sm text-gray-500 dark:text-gray-400">
-                  {{ t('admin.settings.smtp.useTlsHint') }}
-                </p>
-              </div>
-              <Toggle v-model="form.smtp_use_tls" />
+            <div class="border-t border-gray-100 pt-4 dark:border-dark-700">
+              <label class="mb-2 block font-medium text-gray-900 dark:text-white">
+                {{ t('admin.settings.smtp.securityMode') }}
+              </label>
+              <select v-model="form.smtp_security_mode" class="input">
+                <option
+                  v-for="option in smtpSecurityModeOptions"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </option>
+              </select>
+              <p class="mt-1.5 text-sm text-gray-500 dark:text-gray-400">
+                {{ t('admin.settings.smtp.securityModeHint') }}
+              </p>
             </div>
 
           </div>
@@ -2906,6 +2909,7 @@ import type {
   SystemSettings,
   UpdateSettingsRequest,
   DefaultSubscriptionSetting,
+  SmtpSecurityMode,
   WebSearchEmulationConfig,
   WebSearchProviderConfig,
   WebSearchTestResult,
@@ -3027,6 +3031,42 @@ const tablePageSizeMin = 5
 const tablePageSizeMax = 1000
 const tablePageSizeDefault = 20
 
+function normalizeSmtpSecurityMode(
+  mode?: string | null,
+  useTLS?: boolean | null
+): SmtpSecurityMode {
+  if (mode === 'starttls' || mode === 'implicit_tls' || mode === 'plain') {
+    return mode
+  }
+  return useTLS ? 'implicit_tls' : 'starttls'
+}
+
+const smtpSecurityModeOptions = computed(() => [
+  {
+    value: 'starttls' as SmtpSecurityMode,
+    label: t('admin.settings.smtp.securityModeOptions.starttls')
+  },
+  {
+    value: 'implicit_tls' as SmtpSecurityMode,
+    label: t('admin.settings.smtp.securityModeOptions.implicitTls')
+  },
+  {
+    value: 'plain' as SmtpSecurityMode,
+    label: t('admin.settings.smtp.securityModeOptions.plain')
+  }
+])
+
+const smtpPortPlaceholder = computed(() => {
+  switch (form.smtp_security_mode) {
+    case 'implicit_tls':
+      return '465'
+    case 'plain':
+      return '25'
+    default:
+      return '587'
+  }
+})
+
 interface DefaultSubscriptionGroupOption {
   value: number
   label: string
@@ -3083,7 +3123,8 @@ const form = reactive<SettingsForm>({
   smtp_password_configured: false,
   smtp_from_email: '',
   smtp_from_name: '',
-  smtp_use_tls: true,
+  smtp_security_mode: 'starttls',
+  smtp_use_tls: false,
   // Cloudflare Turnstile
   turnstile_enabled: false,
   turnstile_site_key: '',
@@ -3524,6 +3565,11 @@ async function loadSettings() {
         (form as Record<string, unknown>)[key] = value
       }
     }
+    form.smtp_security_mode = normalizeSmtpSecurityMode(
+      settings.smtp_security_mode,
+      settings.smtp_use_tls
+    )
+    form.smtp_use_tls = form.smtp_security_mode === 'implicit_tls'
     form.backend_mode_enabled = settings.backend_mode_enabled
     form.default_subscriptions = Array.isArray(settings.default_subscriptions)
       ? settings.default_subscriptions
@@ -3692,7 +3738,8 @@ async function saveSettings() {
       smtp_password: form.smtp_password || undefined,
       smtp_from_email: form.smtp_from_email,
       smtp_from_name: form.smtp_from_name,
-      smtp_use_tls: form.smtp_use_tls,
+      smtp_security_mode: form.smtp_security_mode,
+      smtp_use_tls: form.smtp_security_mode === 'implicit_tls',
       turnstile_enabled: form.turnstile_enabled,
       turnstile_site_key: form.turnstile_site_key,
       turnstile_secret_key: form.turnstile_secret_key || undefined,
@@ -3768,6 +3815,11 @@ async function saveSettings() {
         (form as Record<string, unknown>)[key] = value
       }
     }
+    form.smtp_security_mode = normalizeSmtpSecurityMode(
+      updated.smtp_security_mode,
+      updated.smtp_use_tls
+    )
+    form.smtp_use_tls = form.smtp_security_mode === 'implicit_tls'
     registrationEmailSuffixWhitelistTags.value = normalizeRegistrationEmailSuffixDomains(
       updated.registration_email_suffix_whitelist
     )
@@ -3804,7 +3856,8 @@ async function testSmtpConnection() {
       smtp_port: form.smtp_port,
       smtp_username: form.smtp_username,
       smtp_password: smtpPasswordForTest,
-      smtp_use_tls: form.smtp_use_tls
+      smtp_security_mode: form.smtp_security_mode,
+      smtp_use_tls: form.smtp_security_mode === 'implicit_tls'
     })
     // API returns { message: "..." } on success, errors are thrown as exceptions
     appStore.showSuccess(result.message || t('admin.settings.smtpConnectionSuccess'))
@@ -3832,7 +3885,8 @@ async function sendTestEmail() {
       smtp_password: smtpPasswordForSend,
       smtp_from_email: form.smtp_from_email,
       smtp_from_name: form.smtp_from_name,
-      smtp_use_tls: form.smtp_use_tls
+      smtp_security_mode: form.smtp_security_mode,
+      smtp_use_tls: form.smtp_security_mode === 'implicit_tls'
     })
     // API returns { message: "..." } on success, errors are thrown as exceptions
     appStore.showSuccess(result.message || t('admin.settings.testEmailSent'))

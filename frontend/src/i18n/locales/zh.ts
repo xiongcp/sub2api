@@ -4888,8 +4888,13 @@ export default {
         fromEmailPlaceholder: "noreply{'@'}example.com",
         fromName: '发件人名称',
         fromNamePlaceholder: 'Sub2API',
-        useTls: '使用 TLS',
-        useTlsHint: '为 SMTP 连接启用 TLS 加密'
+        securityMode: '连接安全',
+        securityModeHint: 'Outlook / Microsoft 365 / Gmail 推荐使用 STARTTLS（587）',
+        securityModeOptions: {
+          starttls: 'STARTTLS（587，推荐）',
+          implicitTls: 'SSL/TLS（465）',
+          plain: '无加密'
+        }
       },
       testEmail: {
         title: '发送测试邮件',

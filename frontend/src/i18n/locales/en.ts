@@ -4724,8 +4724,13 @@ export default {
         fromEmailPlaceholder: "noreply{'@'}example.com",
         fromName: 'From Name',
         fromNamePlaceholder: 'Sub2API',
-        useTls: 'Use TLS',
-        useTlsHint: 'Enable TLS encryption for SMTP connection'
+        securityMode: 'Connection Security',
+        securityModeHint: 'STARTTLS on port 587 is recommended for Outlook / Microsoft 365 / Gmail',
+        securityModeOptions: {
+          starttls: 'STARTTLS (587, recommended)',
+          implicitTls: 'SSL/TLS (465)',
+          plain: 'No encryption'
+        }
       },
       testEmail: {
         title: 'Send Test Email',

@@ -537,6 +537,10 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	}
 	updates[SettingKeySMTPFrom] = settings.SMTPFrom
 	updates[SettingKeySMTPFromName] = settings.SMTPFromName
+	securityMode := NormalizeSMTPSecurityModeWithLegacy(settings.SMTPSecurityMode, settings.SMTPUseTLS)
+	settings.SMTPSecurityMode = string(securityMode)
+	settings.SMTPUseTLS = smtpUseTLSForMode(securityMode)
+	updates[SettingKeySMTPSecurityMode] = settings.SMTPSecurityMode
 	updates[SettingKeySMTPUseTLS] = strconv.FormatBool(settings.SMTPUseTLS)
 
 	// Cloudflare Turnstile 设置（只有非空才更新密钥）
@@ -971,6 +975,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyDefaultBalance:                   strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
 		SettingKeyDefaultSubscriptions:             "[]",
 		SettingKeySMTPPort:                         "587",
+		SettingKeySMTPSecurityMode:                 string(SMTPSecurityModeStartTLS),
 		SettingKeySMTPUseTLS:                       "false",
 		// Model fallback defaults
 		SettingKeyEnableModelFallback:      "false",
@@ -1015,6 +1020,10 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 // parseSettings 解析设置到结构体
 func (s *SettingService) parseSettings(settings map[string]string) *SystemSettings {
 	emailVerifyEnabled := settings[SettingKeyEmailVerifyEnabled] == "true"
+	smtpSecurityMode := NormalizeSMTPSecurityModeWithLegacy(
+		settings[SettingKeySMTPSecurityMode],
+		settings[SettingKeySMTPUseTLS] == "true",
+	)
 	result := &SystemSettings{
 		RegistrationEnabled:              settings[SettingKeyRegistrationEnabled] == "true",
 		EmailVerifyEnabled:               emailVerifyEnabled,
@@ -1028,7 +1037,8 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		SMTPUsername:                     settings[SettingKeySMTPUsername],
 		SMTPFrom:                         settings[SettingKeySMTPFrom],
 		SMTPFromName:                     settings[SettingKeySMTPFromName],
-		SMTPUseTLS:                       settings[SettingKeySMTPUseTLS] == "true",
+		SMTPSecurityMode:                 string(smtpSecurityMode),
+		SMTPUseTLS:                       smtpUseTLSForMode(smtpSecurityMode),
 		SMTPPasswordConfigured:           settings[SettingKeySMTPPassword] != "",
 		TurnstileEnabled:                 settings[SettingKeyTurnstileEnabled] == "true",
 		TurnstileSiteKey:                 settings[SettingKeyTurnstileSiteKey],

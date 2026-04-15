@@ -527,6 +527,7 @@ func TestAPIContracts(t *testing.T) {
 					"smtp_password_configured": true,
 					"smtp_from_email": "no-reply@example.com",
 					"smtp_from_name": "Sub2API",
+					"smtp_security_mode": "implicit_tls",
 					"smtp_use_tls": true,
 					"turnstile_enabled": true,
 					"turnstile_site_key": "site-key",

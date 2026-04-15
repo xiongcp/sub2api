@@ -11,6 +11,8 @@ export interface DefaultSubscriptionSetting {
   validity_days: number
 }
 
+export type SmtpSecurityMode = 'starttls' | 'implicit_tls' | 'plain'
+
 /**
  * System settings interface
  */
@@ -55,6 +57,7 @@ export interface SystemSettings {
   smtp_password_configured: boolean
   smtp_from_email: string
   smtp_from_name: string
+  smtp_security_mode: SmtpSecurityMode
   smtp_use_tls: boolean
   // Cloudflare Turnstile settings
   turnstile_enabled: boolean
@@ -185,6 +188,7 @@ export interface UpdateSettingsRequest {
   smtp_password?: string
   smtp_from_email?: string
   smtp_from_name?: string
+  smtp_security_mode?: SmtpSecurityMode
   smtp_use_tls?: boolean
   turnstile_enabled?: boolean
   turnstile_site_key?: string
@@ -286,6 +290,7 @@ export interface TestSmtpRequest {
   smtp_port: number
   smtp_username: string
   smtp_password: string
+  smtp_security_mode: SmtpSecurityMode
   smtp_use_tls: boolean
 }
 
@@ -310,6 +315,7 @@ export interface SendTestEmailRequest {
   smtp_password: string
   smtp_from_email: string
   smtp_from_name: string
+  smtp_security_mode: SmtpSecurityMode
   smtp_use_tls: boolean
 }
 

@@ -224,6 +224,29 @@ func TestSettingService_UpdateSettings_TablePreferences(t *testing.T) {
 	require.Equal(t, "[20,100]", repo.updates[SettingKeyTablePageSizeOptions])
 }
 
+func TestSettingService_UpdateSettings_SMTPPersistsSecurityModeAndLegacyFlag(t *testing.T) {
+	repo := &settingUpdateRepoStub{}
+	svc := NewSettingService(repo, &config.Config{})
+
+	err := svc.UpdateSettings(context.Background(), &SystemSettings{
+		SMTPHost:         "smtp.example.com",
+		SMTPPort:         587,
+		SMTPSecurityMode: string(SMTPSecurityModeStartTLS),
+	})
+	require.NoError(t, err)
+	require.Equal(t, string(SMTPSecurityModeStartTLS), repo.updates[SettingKeySMTPSecurityMode])
+	require.Equal(t, "false", repo.updates[SettingKeySMTPUseTLS])
+
+	err = svc.UpdateSettings(context.Background(), &SystemSettings{
+		SMTPHost:   "smtp.example.com",
+		SMTPPort:   465,
+		SMTPUseTLS: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, string(SMTPSecurityModeImplicitTLS), repo.updates[SettingKeySMTPSecurityMode])
+	require.Equal(t, "true", repo.updates[SettingKeySMTPUseTLS])
+}
+
 func TestSettingService_UpdateSettings_CustomBrandingSlots(t *testing.T) {
 	repo := &settingUpdateRepoStub{}
 	svc := NewSettingService(repo, &config.Config{})

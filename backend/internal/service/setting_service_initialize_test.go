@@ -109,3 +109,15 @@ func TestSettingService_InitializeDefaultSettings_PreservesExplicitEmptyBranding
 	require.NotContains(t, repo.writes, SettingKeyPaymentFooterHTML)
 	require.NotContains(t, repo.writes, SettingKeyGlobalFooterHTML)
 }
+
+func TestSettingService_InitializeDefaultSettings_SetsSMTPSecurityModeDefault(t *testing.T) {
+	repo := &settingInitializeRepoStub{
+		values: map[string]string{},
+	}
+	svc := NewSettingService(repo, &config.Config{})
+
+	err := svc.InitializeDefaultSettings(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, string(SMTPSecurityModeStartTLS), repo.writes[SettingKeySMTPSecurityMode])
+	require.Equal(t, "false", repo.writes[SettingKeySMTPUseTLS])
+}
