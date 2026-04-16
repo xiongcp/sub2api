@@ -1,4 +1,57 @@
 ## Goal
+- 提交当前设置页 i18n/CSP 修复，推送 `main`，发布正式版 `v0.1.116`，并推送 `chengpengxiong/sub2api:0.1.116` 与 `chengpengxiong/sub2api:latest` 镜像。
+
+## Todo
+- 无。
+
+## Doing
+- 无。
+
+## Done
+- 已确认当前 `v0.1.115` 已存在，新的设置页修复不能复用旧版本号发布。
+- 已将 `backend/cmd/server/VERSION` 更新为 `0.1.116`。
+- 已完成本轮前端 i18n 修复的目标测试与构建验证。
+
+## Validation
+- `git diff --check -- TODO.md frontend/src/i18n/locales/en.ts frontend/src/i18n/locales/zh.ts frontend/src/i18n/__tests__/localeLiteralAtSign.spec.ts deploy/config.example.yaml backend/internal/config/config.go backend/cmd/server/VERSION`
+- `cd frontend && pnpm test:run src/i18n/__tests__/usageServiceTierLocales.spec.ts src/i18n/__tests__/localeLiteralAtSign.spec.ts`
+- `cd frontend && pnpm build`
+
+## Risks
+- Rocket Loader 冲突属于 Cloudflare 边缘层配置问题，镜像发布后仍需要在线上 Cloudflare 关闭该站点/路径的 Rocket Loader。
+- 若继续沿用 `0.1.115` 发布，会造成 git tag 与 Docker 镜像内容不一致，因此本轮统一提升到 `0.1.116`。
+
+## Next Steps
+- 提交代码、推送分支与 tag，并发布 `0.1.116` / `latest` 镜像。
+
+## Goal
+- 修复设置页因 `vue-i18n` locale 文案触发的 `Invalid linked format` 报错，并在仓库中补充 Cloudflare Rocket Loader 与 nonce CSP 不兼容的运维约束说明。
+
+## Todo
+- 无。
+
+## Doing
+- 无。
+
+## Done
+- 已确认设置页异常的直接根因是顶部横幅占位文案里的裸 `@support`，被 `vue-i18n` 当作 linked message 语法解析。
+- 已将中英文 locale 中的 `@support` 改为字面量插值写法，避免运行时解析异常。
+- 已新增 i18n 回归测试，覆盖中英文顶部横幅占位文案可正常渲染且包含字面量 `@support`。
+- 已在配置示例和默认 CSP 注释中补充说明：启用 nonce-based CSP 的站点不应同时开启 Cloudflare Rocket Loader。
+
+## Validation
+- `git diff --check -- TODO.md frontend/src/i18n/locales/en.ts frontend/src/i18n/locales/zh.ts frontend/src/i18n/__tests__/localeLiteralAtSign.spec.ts deploy/config.example.yaml backend/internal/config/config.go`
+- `cd frontend && pnpm test:run src/i18n/__tests__/usageServiceTierLocales.spec.ts src/i18n/__tests__/localeLiteralAtSign.spec.ts`
+- `cd frontend && pnpm build`
+
+## Risks
+- Rocket Loader 冲突属于 Cloudflare 边缘层配置问题，仓库内只能记录运维约束，不能直接替你修改线上配置。
+- 本次仅修复已定位的 locale 根因；若其他新文案再次引入裸 `@...`，仍可能复现同类问题。
+
+## Next Steps
+- 线上需要在 Cloudflare 里关闭当前站点/路径的 Rocket Loader，否则仍会继续触发外部内联脚本的 CSP 拦截。
+
+## Goal
 - 提交当前工作区内已完成的密码重置与顶部横幅改动，推送 `main`，发布正式版 `v0.1.115`，并推送 `chengpengxiong/sub2api:0.1.115` 与 `chengpengxiong/sub2api:latest` 镜像。
 
 ## Todo

@@ -4714,7 +4714,7 @@ export default {
         topBannerEnabled: '顶部通知横幅',
         topBannerHint: '登录后在页面顶部持续展示一条运营提示，适合充值联系、活动公告等固定消息。',
         topBannerText: '横幅文案',
-        topBannerTextPlaceholder: '例如：充值请联系 Telegram: @support',
+        topBannerTextPlaceholder: "例如：充值请联系 Telegram: {'@'}support",
         topBannerTextHint: '仅支持纯文本。用户可在本地关闭，后台修改文案后会重新显示。',
         docUrl: '文档链接',
         docUrlHint: '文档网站的链接。留空则隐藏文档链接。',

@@ -4553,7 +4553,7 @@ export default {
         topBannerEnabled: 'Top Banner Notice',
         topBannerHint: 'Show a persistent message at the top of logged-in pages for recharge contact info or other fixed operational notices.',
         topBannerText: 'Banner Text',
-        topBannerTextPlaceholder: 'e.g., For recharge support, contact Telegram: @support',
+        topBannerTextPlaceholder: "e.g., For recharge support, contact Telegram: {'@'}support",
         topBannerTextHint: 'Plain text only. Users can dismiss it locally; updating the text will show it again.',
         docUrl: 'Documentation URL',
         docUrlPlaceholder: 'https://docs.example.com',
