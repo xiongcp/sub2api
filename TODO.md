@@ -11,18 +11,26 @@
 - 已确认当前 `v0.1.115` 已存在，新的设置页修复不能复用旧版本号发布。
 - 已将 `backend/cmd/server/VERSION` 更新为 `0.1.116`。
 - 已完成本轮前端 i18n 修复的目标测试与构建验证。
+- 已创建发布提交 `eb80808e fix(i18n): escape literal @ in settings locale placeholders` 并推送到 `origin/main`。
+- 已创建并推送 git tag `v0.1.116`。
+- 已构建并推送 `chengpengxiong/sub2api:0.1.116` 与 `chengpengxiong/sub2api:latest`，两者 digest 同为 `sha256:31268030d39aaa3f30f9aef14dcbdfa5e0aea5a3b31c6adcba8d386b10ee903d`。
 
 ## Validation
 - `git diff --check -- TODO.md frontend/src/i18n/locales/en.ts frontend/src/i18n/locales/zh.ts frontend/src/i18n/__tests__/localeLiteralAtSign.spec.ts deploy/config.example.yaml backend/internal/config/config.go backend/cmd/server/VERSION`
 - `cd frontend && pnpm test:run src/i18n/__tests__/usageServiceTierLocales.spec.ts src/i18n/__tests__/localeLiteralAtSign.spec.ts`
 - `cd frontend && pnpm build`
+- `git push origin main`
+- `git push origin v0.1.116`
+- `docker build -t chengpengxiong/sub2api:0.1.116 -t chengpengxiong/sub2api:latest --build-arg VERSION=0.1.116 --build-arg COMMIT=eb80808e --build-arg DATE=<UTC时间> --build-arg GOPROXY=https://goproxy.cn,direct --build-arg GOSUMDB=sum.golang.google.cn -f Dockerfile .`
+- `docker push chengpengxiong/sub2api:0.1.116`
+- `docker push chengpengxiong/sub2api:latest`
 
 ## Risks
 - Rocket Loader 冲突属于 Cloudflare 边缘层配置问题，镜像发布后仍需要在线上 Cloudflare 关闭该站点/路径的 Rocket Loader。
 - 若继续沿用 `0.1.115` 发布，会造成 git tag 与 Docker 镜像内容不一致，因此本轮统一提升到 `0.1.116`。
 
 ## Next Steps
-- 提交代码、推送分支与 tag，并发布 `0.1.116` / `latest` 镜像。
+- 线上需要在 Cloudflare 里关闭当前站点/路径的 Rocket Loader，否则仍会继续触发外部内联脚本的 CSP 拦截。
 
 ## Goal
 - 修复设置页因 `vue-i18n` locale 文案触发的 `Invalid linked format` 报错，并在仓库中补充 Cloudflare Rocket Loader 与 nonce CSP 不兼容的运维约束说明。
