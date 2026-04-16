@@ -2287,6 +2287,159 @@
               </p>
             </div>
 
+            <div class="space-y-4 border-t border-gray-100 pt-4 dark:border-dark-700">
+              <div>
+                <h3 class="text-sm font-medium text-gray-900 dark:text-white">
+                  {{ t('admin.settings.site.apiKeyUsageGuideTitle') }}
+                </h3>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.site.apiKeyUsageGuideDescription') }}
+                </p>
+              </div>
+
+              <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <div>
+                  <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('admin.settings.site.apiKeyUsageGuideDescriptionField') }}
+                  </label>
+                  <textarea
+                    v-model="form.api_key_usage_guide_content.description"
+                    rows="3"
+                    class="input"
+                    :placeholder="t('admin.settings.site.apiKeyUsageGuidePlaceholder')"
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('admin.settings.site.apiKeyUsageGuideNoteField') }}
+                  </label>
+                  <textarea
+                    v-model="form.api_key_usage_guide_content.note"
+                    rows="3"
+                    class="input"
+                    :placeholder="t('admin.settings.site.apiKeyUsageGuidePlaceholder')"
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('admin.settings.site.apiKeyUsageGuideNoGroupTitle') }}
+                  </label>
+                  <input
+                    v-model="form.api_key_usage_guide_content.no_group_title"
+                    type="text"
+                    class="input"
+                    :placeholder="t('admin.settings.site.apiKeyUsageGuideInputPlaceholder')"
+                  />
+                </div>
+
+                <div>
+                  <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('admin.settings.site.apiKeyUsageGuideNoGroupDescription') }}
+                  </label>
+                  <textarea
+                    v-model="form.api_key_usage_guide_content.no_group_description"
+                    rows="3"
+                    class="input"
+                    :placeholder="t('admin.settings.site.apiKeyUsageGuidePlaceholder')"
+                  ></textarea>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <div class="space-y-3 rounded-xl border border-gray-100 p-4 dark:border-dark-700">
+                  <h4 class="text-sm font-medium text-gray-900 dark:text-white">
+                    {{ t('admin.settings.site.apiKeyUsageGuideOpenAI') }}
+                  </h4>
+                  <textarea
+                    v-model="form.api_key_usage_guide_content.openai.description"
+                    rows="3"
+                    class="input"
+                    :placeholder="t('admin.settings.site.apiKeyUsageGuideDescriptionField')"
+                  ></textarea>
+                  <input
+                    v-model="form.api_key_usage_guide_content.openai.config_toml_hint"
+                    type="text"
+                    class="input"
+                    :placeholder="t('admin.settings.site.apiKeyUsageGuideConfigTomlHint')"
+                  />
+                  <textarea
+                    v-model="form.api_key_usage_guide_content.openai.note"
+                    rows="3"
+                    class="input"
+                    :placeholder="t('admin.settings.site.apiKeyUsageGuideUnixNote')"
+                  ></textarea>
+                  <textarea
+                    v-model="form.api_key_usage_guide_content.openai.note_windows"
+                    rows="3"
+                    class="input"
+                    :placeholder="t('admin.settings.site.apiKeyUsageGuideWindowsNote')"
+                  ></textarea>
+                </div>
+
+                <div class="space-y-3 rounded-xl border border-gray-100 p-4 dark:border-dark-700">
+                  <h4 class="text-sm font-medium text-gray-900 dark:text-white">
+                    {{ t('admin.settings.site.apiKeyUsageGuideGemini') }}
+                  </h4>
+                  <textarea
+                    v-model="form.api_key_usage_guide_content.gemini.description"
+                    rows="3"
+                    class="input"
+                    :placeholder="t('admin.settings.site.apiKeyUsageGuideDescriptionField')"
+                  ></textarea>
+                  <input
+                    v-model="form.api_key_usage_guide_content.gemini.model_comment"
+                    type="text"
+                    class="input"
+                    :placeholder="t('admin.settings.site.apiKeyUsageGuideModelComment')"
+                  />
+                  <textarea
+                    v-model="form.api_key_usage_guide_content.gemini.note"
+                    rows="3"
+                    class="input"
+                    :placeholder="t('admin.settings.site.apiKeyUsageGuideUnixNote')"
+                  ></textarea>
+                </div>
+
+                <div class="space-y-3 rounded-xl border border-gray-100 p-4 dark:border-dark-700">
+                  <h4 class="text-sm font-medium text-gray-900 dark:text-white">
+                    {{ t('admin.settings.site.apiKeyUsageGuideAntigravity') }}
+                  </h4>
+                  <textarea
+                    v-model="form.api_key_usage_guide_content.antigravity.description"
+                    rows="3"
+                    class="input"
+                    :placeholder="t('admin.settings.site.apiKeyUsageGuideDescriptionField')"
+                  ></textarea>
+                  <textarea
+                    v-model="form.api_key_usage_guide_content.antigravity.claude_note"
+                    rows="3"
+                    class="input"
+                    :placeholder="t('admin.settings.site.apiKeyUsageGuideClaudeNote')"
+                  ></textarea>
+                  <textarea
+                    v-model="form.api_key_usage_guide_content.antigravity.gemini_note"
+                    rows="3"
+                    class="input"
+                    :placeholder="t('admin.settings.site.apiKeyUsageGuideGeminiNote')"
+                  ></textarea>
+                </div>
+
+                <div class="space-y-3 rounded-xl border border-gray-100 p-4 dark:border-dark-700">
+                  <h4 class="text-sm font-medium text-gray-900 dark:text-white">
+                    {{ t('admin.settings.site.apiKeyUsageGuideOpenCode') }}
+                  </h4>
+                  <textarea
+                    v-model="form.api_key_usage_guide_content.opencode.hint"
+                    rows="4"
+                    class="input"
+                    :placeholder="t('admin.settings.site.apiKeyUsageGuideHint')"
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+
             <!-- Hide CCS Import Button -->
             <div
               class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
@@ -3099,6 +3252,43 @@ type SettingsForm = SystemSettings & {
   oidc_connect_client_secret: string
 }
 
+const createEmptyApiKeyUsageGuideContent = (): SystemSettings['api_key_usage_guide_content'] => ({
+  description: '',
+  note: '',
+  no_group_title: '',
+  no_group_description: '',
+  openai: {
+    description: '',
+    config_toml_hint: '',
+    note: '',
+    note_windows: '',
+    model_comment: '',
+    claude_note: '',
+    gemini_note: ''
+  },
+  gemini: {
+    description: '',
+    config_toml_hint: '',
+    note: '',
+    note_windows: '',
+    model_comment: '',
+    claude_note: '',
+    gemini_note: ''
+  },
+  antigravity: {
+    description: '',
+    config_toml_hint: '',
+    note: '',
+    note_windows: '',
+    model_comment: '',
+    claude_note: '',
+    gemini_note: ''
+  },
+  opencode: {
+    hint: ''
+  }
+})
+
 const form = reactive<SettingsForm>({
   registration_enabled: true,
   email_verify_enabled: false,
@@ -3123,6 +3313,7 @@ const form = reactive<SettingsForm>({
   register_extra_html: '',
   payment_footer_html: '',
   global_footer_html: '',
+  api_key_usage_guide_content: createEmptyApiKeyUsageGuideContent(),
   backend_mode_enabled: false,
   hide_ccs_import_button: false,
   payment_enabled: false,  payment_min_amount: 1,  payment_max_amount: 10000,  payment_daily_limit: 50000,  payment_max_pending_orders: 3,  payment_order_timeout_minutes: 30,  payment_balance_disabled: false,  payment_balance_recharge_multiplier: 1,  payment_recharge_fee_rate: 0,  payment_enabled_types: [],  payment_help_image_url: '',  payment_help_text: '',  payment_product_name_prefix: '',  payment_product_name_suffix: '',  payment_load_balance_strategy: 'round-robin',  payment_cancel_rate_limit_enabled: false,  payment_cancel_rate_limit_max: 10,  payment_cancel_rate_limit_window: 1,  payment_cancel_rate_limit_unit: 'day',  payment_cancel_rate_limit_window_mode: 'rolling',
@@ -3740,6 +3931,7 @@ async function saveSettings() {
       register_extra_html: form.register_extra_html,
       payment_footer_html: form.payment_footer_html,
       global_footer_html: form.global_footer_html,
+      api_key_usage_guide_content: form.api_key_usage_guide_content,
       backend_mode_enabled: form.backend_mode_enabled,
       hide_ccs_import_button: form.hide_ccs_import_button,
       table_default_page_size: form.table_default_page_size,

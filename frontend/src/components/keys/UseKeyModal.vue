@@ -13,10 +13,10 @@
         </svg>
         <div>
           <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-            {{ t('keys.useKeyModal.noGroupTitle') }}
+            {{ noGroupTitle }}
           </p>
           <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-            {{ t('keys.useKeyModal.noGroupDescription') }}
+            {{ noGroupDescription }}
           </p>
         </div>
       </div>
@@ -139,14 +139,16 @@ import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
-import type { GroupPlatform } from '@/types'
+import type { ApiKeyUsageGuideContent, GroupPlatform } from '@/types'
 
 interface Props {
   show: boolean
   apiKey: string
   baseUrl: string
+  dynamicBaseUrl?: string
   platform: GroupPlatform | null
   allowMessagesDispatch?: boolean
+  usageGuideContent?: ApiKeyUsageGuideContent | null
 }
 
 interface Emits {
@@ -310,6 +312,18 @@ const openaiTabs: TabConfig[] = [
 ]
 
 const showShellTabs = computed(() => activeClientTab.value !== 'opencode')
+const guideContent = computed(() => props.usageGuideContent ?? null)
+
+const resolveGuideText = (value: string | undefined | null, fallbackKey: string) => {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : t(fallbackKey)
+}
+
+const resolvePlatformGuideText = (
+  platform: 'openai' | 'gemini' | 'antigravity',
+  field: keyof ApiKeyUsageGuideContent['openai'],
+  fallbackKey: string
+) => resolveGuideText(guideContent.value?.[platform]?.[field], fallbackKey)
 
 const currentTabs = computed(() => {
   if (!showShellTabs.value) return []
@@ -323,15 +337,15 @@ const platformDescription = computed(() => {
   switch (props.platform) {
     case 'openai':
       if (activeClientTab.value === 'claude') {
-        return t('keys.useKeyModal.description')
+        return resolveGuideText(guideContent.value?.description, 'keys.useKeyModal.description')
       }
-      return t('keys.useKeyModal.openai.description')
+      return resolvePlatformGuideText('openai', 'description', 'keys.useKeyModal.openai.description')
     case 'gemini':
-      return t('keys.useKeyModal.gemini.description')
+      return resolvePlatformGuideText('gemini', 'description', 'keys.useKeyModal.gemini.description')
     case 'antigravity':
-      return t('keys.useKeyModal.antigravity.description')
+      return resolvePlatformGuideText('antigravity', 'description', 'keys.useKeyModal.antigravity.description')
     default:
-      return t('keys.useKeyModal.description')
+      return resolveGuideText(guideContent.value?.description, 'keys.useKeyModal.description')
   }
 })
 
@@ -339,23 +353,25 @@ const platformNote = computed(() => {
   switch (props.platform) {
     case 'openai':
       if (activeClientTab.value === 'claude') {
-        return t('keys.useKeyModal.note')
+        return resolveGuideText(guideContent.value?.note, 'keys.useKeyModal.note')
       }
       return activeTab.value === 'windows'
-        ? t('keys.useKeyModal.openai.noteWindows')
-        : t('keys.useKeyModal.openai.note')
+        ? resolvePlatformGuideText('openai', 'note_windows', 'keys.useKeyModal.openai.noteWindows')
+        : resolvePlatformGuideText('openai', 'note', 'keys.useKeyModal.openai.note')
     case 'gemini':
-      return t('keys.useKeyModal.gemini.note')
+      return resolvePlatformGuideText('gemini', 'note', 'keys.useKeyModal.gemini.note')
     case 'antigravity':
       return activeClientTab.value === 'claude'
-        ? t('keys.useKeyModal.antigravity.claudeNote')
-        : t('keys.useKeyModal.antigravity.geminiNote')
+        ? resolvePlatformGuideText('antigravity', 'claude_note', 'keys.useKeyModal.antigravity.claudeNote')
+        : resolvePlatformGuideText('antigravity', 'gemini_note', 'keys.useKeyModal.antigravity.geminiNote')
     default:
-      return t('keys.useKeyModal.note')
+      return resolveGuideText(guideContent.value?.note, 'keys.useKeyModal.note')
   }
 })
 
 const showPlatformNote = computed(() => activeClientTab.value !== 'opencode')
+const noGroupTitle = computed(() => resolveGuideText(guideContent.value?.no_group_title, 'keys.useKeyModal.noGroupTitle'))
+const noGroupDescription = computed(() => resolveGuideText(guideContent.value?.no_group_description, 'keys.useKeyModal.noGroupDescription'))
 
 const escapeHtml = (value: string) => value
   .replace(/&/g, '&amp;')
@@ -376,7 +392,7 @@ const comment = (value: string) => wrapToken('text-slate-500', value)
 // Syntax highlighting helpers
 // Generate file configs based on platform and active tab
 const currentFiles = computed((): FileConfig[] => {
-  const baseUrl = props.baseUrl || window.location.origin
+  const baseUrl = props.dynamicBaseUrl || props.baseUrl || window.location.origin
   const apiKey = props.apiKey
   const baseRoot = baseUrl.replace(/\/v1\/?$/, '').replace(/\/+$/, '')
   const ensureV1 = (value: string) => {
@@ -482,7 +498,7 @@ $env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
 
 function generateGeminiCliContent(baseUrl: string, apiKey: string): FileConfig {
   const model = 'gemini-2.0-flash'
-  const modelComment = t('keys.useKeyModal.gemini.modelComment')
+  const modelComment = resolvePlatformGuideText('gemini', 'model_comment', 'keys.useKeyModal.gemini.modelComment')
   let path: string
   let content: string
   let highlighted: string
@@ -555,7 +571,7 @@ requires_openai_auth = true`
     {
       path: `${configDir}/config.toml`,
       content: configContent,
-      hint: t('keys.useKeyModal.openai.configTomlHint')
+      hint: resolvePlatformGuideText('openai', 'config_toml_hint', 'keys.useKeyModal.openai.configTomlHint')
     },
     {
       path: `${configDir}/auth.json`,
@@ -598,7 +614,7 @@ responses_websockets_v2 = true`
     {
       path: `${configDir}/config.toml`,
       content: configContent,
-      hint: t('keys.useKeyModal.openai.configTomlHint')
+      hint: resolvePlatformGuideText('openai', 'config_toml_hint', 'keys.useKeyModal.openai.configTomlHint')
     },
     {
       path: `${configDir}/auth.json`,
@@ -1113,7 +1129,7 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
   return {
     path: pathLabel ?? 'opencode.json',
     content,
-    hint: t('keys.useKeyModal.opencode.hint')
+    hint: resolveGuideText(guideContent.value?.opencode?.hint, 'keys.useKeyModal.opencode.hint')
   }
 }
 

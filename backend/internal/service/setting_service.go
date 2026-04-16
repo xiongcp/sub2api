@@ -44,6 +44,15 @@ type SettingRepository interface {
 	Delete(ctx context.Context, key string) error
 }
 
+// SettingReadCache defines the Redis-backed L2 cache used by setting reads.
+type SettingReadCache interface {
+	Get(ctx context.Context, key string, dest any) (bool, error)
+	Set(ctx context.Context, key string, value any, ttl time.Duration) error
+	Delete(ctx context.Context, key string) error
+	PublishInvalidation(ctx context.Context, key string) error
+	SubscribeInvalidation(ctx context.Context, handler func(key string)) error
+}
+
 // cachedVersionBounds 缓存 Claude Code 版本号上下限（进程内缓存，60s TTL）
 type cachedVersionBounds struct {
 	min       string // 空字符串 = 不检查
@@ -94,6 +103,33 @@ const gatewayForwardingCacheTTL = 60 * time.Second
 const gatewayForwardingErrorTTL = 5 * time.Second
 const gatewayForwardingDBTimeout = 5 * time.Second
 
+type cachedPublicSettings struct {
+	value     *PublicSettings
+	err       error
+	expiresAt int64
+}
+
+type cachedAPIKeyUsageGuide struct {
+	value     *APIKeyUsageGuide
+	err       error
+	expiresAt int64
+}
+
+type cachedFrontendURL struct {
+	value     string
+	expiresAt int64
+}
+
+const (
+	settingReadCacheL1TTL       = 60 * time.Second
+	settingReadCacheL2TTL       = 5 * time.Minute
+	settingReadCacheErrorTTL    = 5 * time.Second
+	settingReadCacheDBTimeout   = 5 * time.Second
+	settingReadCacheKeyPublic   = "settings:v1:public"
+	settingReadCacheKeyGuide    = "settings:v1:api_key_usage_guide"
+	settingReadCacheKeyFrontend = "settings:v1:frontend_url"
+)
+
 // DefaultSubscriptionGroupReader validates group references used by default subscriptions.
 type DefaultSubscriptionGroupReader interface {
 	GetByID(ctx context.Context, id int64) (*Group, error)
@@ -109,9 +145,16 @@ type SettingService struct {
 	defaultSubGroupReader   DefaultSubscriptionGroupReader
 	proxyRepo               ProxyRepository // for resolving websearch provider proxy URLs
 	cfg                     *config.Config
+	readCache               SettingReadCache
 	onUpdate                func() // Callback when settings are updated (for cache invalidation)
 	version                 string // Application version
 	webSearchManagerBuilder WebSearchManagerBuilder
+	publicSettingsCache     atomic.Value // *cachedPublicSettings
+	publicSettingsSF        singleflight.Group
+	apiKeyUsageGuideCache   atomic.Value // *cachedAPIKeyUsageGuide
+	apiKeyUsageGuideSF      singleflight.Group
+	frontendURLCache        atomic.Value // *cachedFrontendURL
+	frontendURLSF           singleflight.Group
 }
 
 // NewSettingService 创建系统设置服务实例
@@ -132,6 +175,23 @@ func (s *SettingService) SetProxyRepository(repo ProxyRepository) {
 	s.proxyRepo = repo
 }
 
+// SetReadCache injects the optional Redis-backed read cache for setting bundles.
+func (s *SettingService) SetReadCache(cache SettingReadCache) {
+	s.readCache = cache
+}
+
+// StartReadCacheInvalidationSubscriber starts the Pub/Sub subscriber for read cache invalidation.
+func (s *SettingService) StartReadCacheInvalidationSubscriber(ctx context.Context) {
+	if s == nil || s.readCache == nil {
+		return
+	}
+	if err := s.readCache.SubscribeInvalidation(ctx, func(key string) {
+		s.invalidateLocalReadCache(key)
+	}); err != nil {
+		slog.Warn("failed to subscribe setting read cache invalidation", "error", err)
+	}
+}
+
 // GetAllSettings 获取所有系统设置
 func (s *SettingService) GetAllSettings(ctx context.Context) (*SystemSettings, error) {
 	settings, err := s.settingRepo.GetAll(ctx)
@@ -144,15 +204,167 @@ func (s *SettingService) GetAllSettings(ctx context.Context) (*SystemSettings, e
 
 // GetFrontendURL 获取前端基础URL（数据库优先，fallback 到配置文件）
 func (s *SettingService) GetFrontendURL(ctx context.Context) string {
-	val, err := s.settingRepo.GetValue(ctx, SettingKeyFrontendURL)
-	if err == nil && strings.TrimSpace(val) != "" {
-		return strings.TrimSpace(val)
+	if cached, ok := s.frontendURLCache.Load().(*cachedFrontendURL); ok && cached != nil {
+		if time.Now().UnixNano() < cached.expiresAt {
+			return cached.value
+		}
 	}
-	return s.cfg.Server.FrontendURL
+
+	value, _, _ := s.frontendURLSF.Do(settingReadCacheKeyFrontend, func() (any, error) {
+		if cached, ok := s.frontendURLCache.Load().(*cachedFrontendURL); ok && cached != nil {
+			if time.Now().UnixNano() < cached.expiresAt {
+				return cached.value, nil
+			}
+		}
+
+		if s.readCache != nil {
+			var cachedValue string
+			ok, err := s.readCache.Get(ctx, settingReadCacheKeyFrontend, &cachedValue)
+			if err != nil {
+				slog.Warn("failed to get frontend_url from redis cache", "error", err)
+			} else if ok {
+				s.storeFrontendURLCache(cachedValue, settingReadCacheL1TTL)
+				return cachedValue, nil
+			}
+		}
+
+		dbCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), settingReadCacheDBTimeout)
+		defer cancel()
+		frontendURL := s.loadFrontendURLFromRepo(dbCtx)
+		s.storeFrontendURLCache(frontendURL, settingReadCacheL1TTL)
+		if s.readCache != nil {
+			if err := s.readCache.Set(ctx, settingReadCacheKeyFrontend, frontendURL, settingReadCacheL2TTL); err != nil {
+				slog.Warn("failed to set frontend_url redis cache", "error", err)
+			}
+		}
+		return frontendURL, nil
+	})
+
+	if frontendURL, ok := value.(string); ok {
+		return frontendURL
+	}
+	return s.loadFrontendURLFromRepo(ctx)
 }
 
 // GetPublicSettings 获取公开设置（无需登录）
 func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings, error) {
+	if cached, ok := s.publicSettingsCache.Load().(*cachedPublicSettings); ok && cached != nil {
+		if time.Now().UnixNano() < cached.expiresAt {
+			if cached.err != nil {
+				return nil, cached.err
+			}
+			return clonePublicSettings(cached.value), nil
+		}
+	}
+
+	value, err, _ := s.publicSettingsSF.Do(settingReadCacheKeyPublic, func() (any, error) {
+		if cached, ok := s.publicSettingsCache.Load().(*cachedPublicSettings); ok && cached != nil {
+			if time.Now().UnixNano() < cached.expiresAt {
+				if cached.err != nil {
+					return nil, cached.err
+				}
+				return clonePublicSettings(cached.value), nil
+			}
+		}
+
+		if s.readCache != nil {
+			var cachedValue PublicSettings
+			ok, err := s.readCache.Get(ctx, settingReadCacheKeyPublic, &cachedValue)
+			if err != nil {
+				slog.Warn("failed to get public settings from redis cache", "error", err)
+			} else if ok {
+				s.storePublicSettingsCache(&cachedValue, nil, settingReadCacheL1TTL)
+				return clonePublicSettings(&cachedValue), nil
+			}
+		}
+
+		dbCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), settingReadCacheDBTimeout)
+		defer cancel()
+		settings, err := s.loadPublicSettingsFromRepo(dbCtx)
+		if err != nil {
+			s.storePublicSettingsCache(nil, err, settingReadCacheErrorTTL)
+			return nil, err
+		}
+		s.storePublicSettingsCache(settings, nil, settingReadCacheL1TTL)
+		if s.readCache != nil {
+			if err := s.readCache.Set(ctx, settingReadCacheKeyPublic, settings, settingReadCacheL2TTL); err != nil {
+				slog.Warn("failed to set public settings redis cache", "error", err)
+			}
+		}
+		return clonePublicSettings(settings), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	settings, _ := value.(*PublicSettings)
+	return settings, nil
+}
+
+func (s *SettingService) GetAPIKeyUsageGuide(ctx context.Context) (*APIKeyUsageGuide, error) {
+	if cached, ok := s.apiKeyUsageGuideCache.Load().(*cachedAPIKeyUsageGuide); ok && cached != nil {
+		if time.Now().UnixNano() < cached.expiresAt {
+			if cached.err != nil {
+				return nil, cached.err
+			}
+			return cloneAPIKeyUsageGuide(cached.value), nil
+		}
+	}
+
+	value, err, _ := s.apiKeyUsageGuideSF.Do(settingReadCacheKeyGuide, func() (any, error) {
+		if cached, ok := s.apiKeyUsageGuideCache.Load().(*cachedAPIKeyUsageGuide); ok && cached != nil {
+			if time.Now().UnixNano() < cached.expiresAt {
+				if cached.err != nil {
+					return nil, cached.err
+				}
+				return cloneAPIKeyUsageGuide(cached.value), nil
+			}
+		}
+
+		if s.readCache != nil {
+			var cachedValue APIKeyUsageGuide
+			ok, err := s.readCache.Get(ctx, settingReadCacheKeyGuide, &cachedValue)
+			if err != nil {
+				slog.Warn("failed to get api key usage guide from redis cache", "error", err)
+			} else if ok {
+				s.storeAPIKeyUsageGuideCache(&cachedValue, nil, settingReadCacheL1TTL)
+				return cloneAPIKeyUsageGuide(&cachedValue), nil
+			}
+		}
+
+		dbCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), settingReadCacheDBTimeout)
+		defer cancel()
+		guide, err := s.loadAPIKeyUsageGuideFromRepo(dbCtx)
+		if err != nil {
+			s.storeAPIKeyUsageGuideCache(nil, err, settingReadCacheErrorTTL)
+			return nil, err
+		}
+		s.storeAPIKeyUsageGuideCache(guide, nil, settingReadCacheL1TTL)
+		if s.readCache != nil {
+			if err := s.readCache.Set(ctx, settingReadCacheKeyGuide, guide, settingReadCacheL2TTL); err != nil {
+				slog.Warn("failed to set api key usage guide redis cache", "error", err)
+			}
+		}
+		return cloneAPIKeyUsageGuide(guide), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	guide, _ := value.(*APIKeyUsageGuide)
+	return guide, nil
+}
+
+func (s *SettingService) loadFrontendURLFromRepo(ctx context.Context) string {
+	val, err := s.settingRepo.GetValue(ctx, SettingKeyFrontendURL)
+	if err == nil && strings.TrimSpace(val) != "" {
+		return strings.TrimSpace(val)
+	}
+	if s.cfg != nil {
+		return s.cfg.Server.FrontendURL
+	}
+	return ""
+}
+
+func (s *SettingService) loadPublicSettingsFromRepo(ctx context.Context) (*PublicSettings, error) {
 	keys := []string{
 		SettingKeyRegistrationEnabled,
 		SettingKeyEmailVerifyEnabled,
@@ -218,7 +430,6 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		oidcProviderName = "OIDC"
 	}
 
-	// Password reset requires email verification to be enabled
 	emailVerifyEnabled := settings[SettingKeyEmailVerifyEnabled] == "true"
 	passwordResetEnabled := emailVerifyEnabled && settings[SettingKeyPasswordResetEnabled] == "true"
 	registrationEmailSuffixWhitelist := ParseRegistrationEmailSuffixWhitelist(
@@ -238,7 +449,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		RegistrationEnabled:              settings[SettingKeyRegistrationEnabled] == "true",
 		EmailVerifyEnabled:               emailVerifyEnabled,
 		RegistrationEmailSuffixWhitelist: registrationEmailSuffixWhitelist,
-		PromoCodeEnabled:                 settings[SettingKeyPromoCodeEnabled] != "false", // 默认启用
+		PromoCodeEnabled:                 settings[SettingKeyPromoCodeEnabled] != "false",
 		PasswordResetEnabled:             passwordResetEnabled,
 		InvitationCodeEnabled:            settings[SettingKeyInvitationCodeEnabled] == "true",
 		TotpEnabled:                      settings[SettingKeyTotpEnabled] == "true",
@@ -273,6 +484,102 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		BalanceLowNotifyThreshold:        balanceLowNotifyThreshold,
 		BalanceLowNotifyRechargeURL:      settings[SettingKeyBalanceLowNotifyRechargeURL],
 	}, nil
+}
+
+func (s *SettingService) loadAPIKeyUsageGuideFromRepo(ctx context.Context) (*APIKeyUsageGuide, error) {
+	settings, err := s.settingRepo.GetMultiple(ctx, []string{
+		SettingKeyAPIBaseURL,
+		SettingKeyAPIKeyUsageGuideContent,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get api key usage guide: %w", err)
+	}
+
+	return &APIKeyUsageGuide{
+		APIBaseURL: settings[SettingKeyAPIBaseURL],
+		Content:    ParseAPIKeyUsageGuideContent(settings[SettingKeyAPIKeyUsageGuideContent]),
+	}, nil
+}
+
+func (s *SettingService) storePublicSettingsCache(value *PublicSettings, err error, ttl time.Duration) {
+	s.publicSettingsCache.Store(&cachedPublicSettings{
+		value:     clonePublicSettings(value),
+		err:       err,
+		expiresAt: time.Now().Add(ttl).UnixNano(),
+	})
+}
+
+func (s *SettingService) storeAPIKeyUsageGuideCache(value *APIKeyUsageGuide, err error, ttl time.Duration) {
+	s.apiKeyUsageGuideCache.Store(&cachedAPIKeyUsageGuide{
+		value:     cloneAPIKeyUsageGuide(value),
+		err:       err,
+		expiresAt: time.Now().Add(ttl).UnixNano(),
+	})
+}
+
+func (s *SettingService) storeFrontendURLCache(value string, ttl time.Duration) {
+	s.frontendURLCache.Store(&cachedFrontendURL{
+		value:     value,
+		expiresAt: time.Now().Add(ttl).UnixNano(),
+	})
+}
+
+func (s *SettingService) invalidateLocalReadCache(key string) {
+	switch key {
+	case settingReadCacheKeyPublic:
+		s.publicSettingsCache.Store(&cachedPublicSettings{})
+	case settingReadCacheKeyGuide:
+		s.apiKeyUsageGuideCache.Store(&cachedAPIKeyUsageGuide{})
+	case settingReadCacheKeyFrontend:
+		s.frontendURLCache.Store(&cachedFrontendURL{})
+	default:
+		s.publicSettingsCache.Store(&cachedPublicSettings{})
+		s.apiKeyUsageGuideCache.Store(&cachedAPIKeyUsageGuide{})
+		s.frontendURLCache.Store(&cachedFrontendURL{})
+	}
+}
+
+func (s *SettingService) invalidateReadCaches(ctx context.Context) {
+	keys := []string{
+		settingReadCacheKeyPublic,
+		settingReadCacheKeyGuide,
+		settingReadCacheKeyFrontend,
+	}
+
+	for _, key := range keys {
+		s.invalidateLocalReadCache(key)
+		if s.readCache == nil {
+			continue
+		}
+		if err := s.readCache.Delete(ctx, key); err != nil {
+			slog.Warn("failed to delete setting read redis cache", "key", key, "error", err)
+		}
+		if err := s.readCache.PublishInvalidation(ctx, key); err != nil {
+			slog.Warn("failed to publish setting read cache invalidation", "key", key, "error", err)
+		}
+	}
+}
+
+func clonePublicSettings(src *PublicSettings) *PublicSettings {
+	if src == nil {
+		return nil
+	}
+	copied := *src
+	if src.RegistrationEmailSuffixWhitelist != nil {
+		copied.RegistrationEmailSuffixWhitelist = append([]string(nil), src.RegistrationEmailSuffixWhitelist...)
+	}
+	if src.TablePageSizeOptions != nil {
+		copied.TablePageSizeOptions = append([]int(nil), src.TablePageSizeOptions...)
+	}
+	return &copied
+}
+
+func cloneAPIKeyUsageGuide(src *APIKeyUsageGuide) *APIKeyUsageGuide {
+	if src == nil {
+		return nil
+	}
+	copied := *src
+	return &copied
 }
 
 // SetOnUpdateCallback sets a callback function to be called when settings are updated
@@ -597,6 +904,11 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	updates[SettingKeyRegisterExtraHTML] = settings.RegisterExtraHTML
 	updates[SettingKeyPaymentFooterHTML] = settings.PaymentFooterHTML
 	updates[SettingKeyGlobalFooterHTML] = settings.GlobalFooterHTML
+	apiKeyUsageGuideContentJSON, err := json.Marshal(settings.APIKeyUsageGuideContent)
+	if err != nil {
+		return fmt.Errorf("marshal api key usage guide content: %w", err)
+	}
+	updates[SettingKeyAPIKeyUsageGuideContent] = string(apiKeyUsageGuideContentJSON)
 	updates[SettingKeyHideCcsImportButton] = strconv.FormatBool(settings.HideCcsImportButton)
 	updates[SettingKeyPurchaseSubscriptionEnabled] = strconv.FormatBool(settings.PurchaseSubscriptionEnabled)
 	updates[SettingKeyPurchaseSubscriptionURL] = strings.TrimSpace(settings.PurchaseSubscriptionURL)
@@ -684,6 +996,9 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 			cchSigning:             settings.EnableCCHSigning,
 			expiresAt:              time.Now().Add(gatewayForwardingCacheTTL).UnixNano(),
 		})
+		readCacheCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+		s.invalidateReadCaches(readCacheCtx)
+		cancel()
 		if s.onUpdate != nil {
 			s.onUpdate() // Invalidate cache after settings update
 		}
@@ -969,6 +1284,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyTablePageSizeOptions:             "[10,20,50,100]",
 		SettingKeyCustomMenuItems:                  "[]",
 		SettingKeyCustomEndpoints:                  "[]",
+		SettingKeyAPIKeyUsageGuideContent:          "{}",
 		SettingKeyOIDCConnectEnabled:               "false",
 		SettingKeyOIDCConnectProviderName:          "OIDC",
 		SettingKeyDefaultConcurrency:               strconv.Itoa(s.cfg.Default.UserConcurrency),
@@ -1329,6 +1645,19 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	}
 
 	return result
+}
+
+func ParseAPIKeyUsageGuideContent(raw string) APIKeyUsageGuideContent {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || raw == "{}" {
+		return APIKeyUsageGuideContent{}
+	}
+
+	var content APIKeyUsageGuideContent
+	if err := json.Unmarshal([]byte(raw), &content); err != nil {
+		return APIKeyUsageGuideContent{}
+	}
+	return content
 }
 
 func isFalseSettingValue(value string) bool {

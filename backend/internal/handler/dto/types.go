@@ -74,6 +74,16 @@ type APIKey struct {
 	Group *Group `json:"group,omitempty"`
 }
 
+type UserGroupSummary struct {
+	ID               int64   `json:"id"`
+	Name             string  `json:"name"`
+	Description      string  `json:"description"`
+	Platform         string  `json:"platform"`
+	RateMultiplier   float64 `json:"rate_multiplier"`
+	SubscriptionType string  `json:"subscription_type"`
+	AccessScope      string  `json:"access_scope"`
+}
+
 type Group struct {
 	ID             int64   `json:"id"`
 	Name           string  `json:"name"`

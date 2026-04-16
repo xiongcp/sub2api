@@ -368,6 +368,7 @@ export default {
     logout: '退出登录',
     github: 'GitHub',
     mySubscriptions: '我的订阅',
+    availableGroups: '可用分组',
     buySubscription: '充值/订阅',
     docs: '文档',
     myOrders: '我的订单',
@@ -562,6 +563,35 @@ export default {
   // Groups (shared)
   groups: {
     subscription: '订阅'
+  },
+
+  userGroups: {
+    title: '可用分组',
+    description: '查看当前账号可以使用的分组，以及每个分组的基础信息。',
+    emptyTitle: '暂无可用分组',
+    emptyDescription: '当前账号还没有可用分组，请联系管理员授权或开通订阅。',
+    noDescription: '暂无分组说明',
+    failedToLoad: '加载可用分组失败',
+    access: {
+      public: '公开可用',
+      exclusive: '已授权',
+      subscription: '订阅可用'
+    },
+    type: {
+      standard: '标准分组',
+      subscription: '订阅分组'
+    },
+    fields: {
+      platform: '平台',
+      type: '类型',
+      rate: '倍率'
+    },
+    platforms: {
+      anthropic: 'Anthropic',
+      openai: 'OpenAI',
+      gemini: 'Gemini',
+      antigravity: 'Antigravity'
+    }
   },
 
   // API Keys
@@ -4710,6 +4740,25 @@ export default {
         globalFooterHtml: '全局页脚 HTML',
         extraHtmlPlaceholder: '<div>受信任的 HTML 内容</div>',
         brandingSlotsWarning: '仅适用于受信任的管理员内容。HTML 会直接渲染，CSS 可能影响页面布局。',
+        apiKeyUsageGuideTitle: 'API 密钥使用说明',
+        apiKeyUsageGuideDescription: '编辑“使用 API 密钥”弹窗里的说明文案。保存后用户下次点击即可拿到最新内容，无需重新打包前端。',
+        apiKeyUsageGuideDescriptionField: '通用说明',
+        apiKeyUsageGuideNoteField: '通用提示',
+        apiKeyUsageGuideNoGroupTitle: '未分组标题',
+        apiKeyUsageGuideNoGroupDescription: '未分组提示',
+        apiKeyUsageGuideOpenAI: 'OpenAI / Codex',
+        apiKeyUsageGuideGemini: 'Gemini',
+        apiKeyUsageGuideAntigravity: 'Antigravity',
+        apiKeyUsageGuideOpenCode: 'OpenCode',
+        apiKeyUsageGuideConfigTomlHint: 'config.toml 提示',
+        apiKeyUsageGuideModelComment: 'Gemini 模型备注',
+        apiKeyUsageGuideUnixNote: 'macOS / Linux 提示',
+        apiKeyUsageGuideWindowsNote: 'Windows 提示',
+        apiKeyUsageGuideClaudeNote: 'Claude Code 提示',
+        apiKeyUsageGuideGeminiNote: 'Gemini CLI 提示',
+        apiKeyUsageGuideHint: '提示文案',
+        apiKeyUsageGuidePlaceholder: '留空则继续使用前端内置默认文案。',
+        apiKeyUsageGuideInputPlaceholder: '留空则继续使用前端内置默认文案。',
         hideCcsImportButton: '隐藏 CCS 导入按钮',
         hideCcsImportButtonHint: '启用后将在 API Keys 页面隐藏"导入 CCS"按钮'
       },

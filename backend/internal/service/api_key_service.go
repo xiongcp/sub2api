@@ -43,7 +43,21 @@ const (
 	apiKeyLastUsedMinTouch = 30 * time.Second
 	// DB 写失败后的短退避，避免请求路径持续同步重试造成写风暴与高延迟。
 	apiKeyLastUsedFailBackoff = 5 * time.Second
+
+	AvailableGroupAccessScopePublic       = "public"
+	AvailableGroupAccessScopeExclusive    = "exclusive"
+	AvailableGroupAccessScopeSubscription = "subscription"
 )
+
+type AvailableGroupSummary struct {
+	ID               int64
+	Name             string
+	Description      string
+	Platform         string
+	RateMultiplier   float64
+	SubscriptionType string
+	AccessScope      string
+}
 
 type APIKeyRepository interface {
 	Create(ctx context.Context, key *APIKey) error
@@ -740,34 +754,15 @@ func (s *APIKeyService) IncrementUsage(ctx context.Context, keyID int64) error {
 // - 标准类型分组：公开的（非专属）或用户被明确允许的
 // - 订阅类型分组：用户有有效订阅的
 func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([]Group, error) {
-	// 获取用户信息
-	user, err := s.userRepo.GetByID(ctx, userID)
+	user, allGroups, subscribedGroupIDs, err := s.getAvailableGroupContext(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("get user: %w", err)
-	}
-
-	// 获取所有活跃分组
-	allGroups, err := s.groupRepo.ListActive(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("list active groups: %w", err)
-	}
-
-	// 获取用户的所有有效订阅
-	activeSubscriptions, err := s.userSubRepo.ListActiveByUserID(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("list active subscriptions: %w", err)
-	}
-
-	// 构建订阅分组 ID 集合
-	subscribedGroupIDs := make(map[int64]bool)
-	for _, sub := range activeSubscriptions {
-		subscribedGroupIDs[sub.GroupID] = true
+		return nil, err
 	}
 
 	// 过滤出用户有权限的分组
 	availableGroups := make([]Group, 0)
 	for _, group := range allGroups {
-		if s.canUserBindGroupInternal(user, &group, subscribedGroupIDs) {
+		if _, ok := s.getAvailableGroupAccessScope(user, &group, subscribedGroupIDs); ok {
 			availableGroups = append(availableGroups, group)
 		}
 	}
@@ -775,14 +770,75 @@ func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([
 	return availableGroups, nil
 }
 
-// canUserBindGroupInternal 内部方法，检查用户是否可以绑定分组（使用预加载的订阅数据）
-func (s *APIKeyService) canUserBindGroupInternal(user *User, group *Group, subscribedGroupIDs map[int64]bool) bool {
+// GetAvailableGroupSummaries 获取用户可用分组的摘要信息。
+// 仅返回用户可见的基础字段，避免暴露内部调度与兜底配置。
+func (s *APIKeyService) GetAvailableGroupSummaries(ctx context.Context, userID int64) ([]AvailableGroupSummary, error) {
+	user, allGroups, subscribedGroupIDs, err := s.getAvailableGroupContext(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	summaries := make([]AvailableGroupSummary, 0, len(allGroups))
+	for _, group := range allGroups {
+		accessScope, ok := s.getAvailableGroupAccessScope(user, &group, subscribedGroupIDs)
+		if !ok {
+			continue
+		}
+		summaries = append(summaries, AvailableGroupSummary{
+			ID:               group.ID,
+			Name:             group.Name,
+			Description:      group.Description,
+			Platform:         group.Platform,
+			RateMultiplier:   group.RateMultiplier,
+			SubscriptionType: group.SubscriptionType,
+			AccessScope:      accessScope,
+		})
+	}
+
+	return summaries, nil
+}
+
+func (s *APIKeyService) getAvailableGroupContext(ctx context.Context, userID int64) (*User, []Group, map[int64]bool, error) {
+	// 获取用户信息
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("get user: %w", err)
+	}
+
+	// 获取所有活跃分组
+	allGroups, err := s.groupRepo.ListActive(ctx)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("list active groups: %w", err)
+	}
+
+	// 获取用户的所有有效订阅
+	activeSubscriptions, err := s.userSubRepo.ListActiveByUserID(ctx, userID)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("list active subscriptions: %w", err)
+	}
+
+	// 构建订阅分组 ID 集合
+	subscribedGroupIDs := make(map[int64]bool, len(activeSubscriptions))
+	for _, sub := range activeSubscriptions {
+		subscribedGroupIDs[sub.GroupID] = true
+	}
+
+	return user, allGroups, subscribedGroupIDs, nil
+}
+
+// getAvailableGroupAccessScope 内部方法，检查用户是否可以绑定分组，并返回可见性来源。
+func (s *APIKeyService) getAvailableGroupAccessScope(user *User, group *Group, subscribedGroupIDs map[int64]bool) (string, bool) {
 	// 订阅类型分组：需要有效订阅
 	if group.IsSubscriptionType() {
-		return subscribedGroupIDs[group.ID]
+		return AvailableGroupAccessScopeSubscription, subscribedGroupIDs[group.ID]
 	}
-	// 标准类型分组：使用原有逻辑
-	return user.CanBindGroup(group.ID, group.IsExclusive)
+	if !group.IsExclusive {
+		return AvailableGroupAccessScopePublic, true
+	}
+	if user.CanBindGroup(group.ID, true) {
+		return AvailableGroupAccessScopeExclusive, true
+	}
+	return "", false
 }
 
 func (s *APIKeyService) SearchAPIKeys(ctx context.Context, userID int64, keyword string, limit int) ([]APIKey, error) {

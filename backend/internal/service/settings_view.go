@@ -1,5 +1,35 @@
 package service
 
+type APIKeyUsageGuidePlatformContent struct {
+	Description    string `json:"description"`
+	ConfigTomlHint string `json:"config_toml_hint"`
+	Note           string `json:"note"`
+	NoteWindows    string `json:"note_windows"`
+	ModelComment   string `json:"model_comment"`
+	ClaudeNote     string `json:"claude_note"`
+	GeminiNote     string `json:"gemini_note"`
+}
+
+type APIKeyUsageGuideOpenCodeContent struct {
+	Hint string `json:"hint"`
+}
+
+type APIKeyUsageGuideContent struct {
+	Description        string                          `json:"description"`
+	Note               string                          `json:"note"`
+	NoGroupTitle       string                          `json:"no_group_title"`
+	NoGroupDescription string                          `json:"no_group_description"`
+	OpenAI             APIKeyUsageGuidePlatformContent `json:"openai"`
+	Gemini             APIKeyUsageGuidePlatformContent `json:"gemini"`
+	Antigravity        APIKeyUsageGuidePlatformContent `json:"antigravity"`
+	OpenCode           APIKeyUsageGuideOpenCodeContent `json:"opencode"`
+}
+
+type APIKeyUsageGuide struct {
+	APIBaseURL string                  `json:"api_base_url"`
+	Content    APIKeyUsageGuideContent `json:"content"`
+}
+
 type SystemSettings struct {
 	RegistrationEnabled              bool
 	EmailVerifyEnabled               bool
@@ -69,6 +99,7 @@ type SystemSettings struct {
 	RegisterExtraHTML           string
 	PaymentFooterHTML           string
 	GlobalFooterHTML            string
+	APIKeyUsageGuideContent     APIKeyUsageGuideContent
 	HideCcsImportButton         bool
 	PurchaseSubscriptionEnabled bool
 	PurchaseSubscriptionURL     string

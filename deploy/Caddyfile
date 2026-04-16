@@ -108,6 +108,12 @@ api.sub2api.com {
 	# 错误处理
 	# =========================================================================
 	handle_errors {
+		@api path /v1/* /openai/* /gemini/* /google/*
+		handle @api {
+			header Content-Type application/json
+			header Retry-After "1"
+			respond "{\"error\":{\"type\":\"invalid_request_error\",\"code\":\"request_rejected_by_proxy\",\"message\":\"The request could not be processed by the proxy. Please retry.\"}}" {err.status_code}
+		}
 		respond "{err.status_code} {err.status_text}"
 	}
 }

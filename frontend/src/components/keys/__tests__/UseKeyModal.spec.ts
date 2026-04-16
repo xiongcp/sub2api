@@ -23,7 +23,44 @@ describe('UseKeyModal', () => {
         show: true,
         apiKey: 'sk-test',
         baseUrl: 'https://example.com/v1',
-        platform: 'openai'
+        dynamicBaseUrl: 'https://dynamic.example.com/v1',
+        platform: 'openai',
+        usageGuideContent: {
+          description: '',
+          note: '',
+          no_group_title: '',
+          no_group_description: '',
+          openai: {
+            description: '',
+            config_toml_hint: '',
+            note: '',
+            note_windows: '',
+            model_comment: '',
+            claude_note: '',
+            gemini_note: ''
+          },
+          gemini: {
+            description: '',
+            config_toml_hint: '',
+            note: '',
+            note_windows: '',
+            model_comment: '',
+            claude_note: '',
+            gemini_note: ''
+          },
+          antigravity: {
+            description: '',
+            config_toml_hint: '',
+            note: '',
+            note_windows: '',
+            model_comment: '',
+            claude_note: '',
+            gemini_note: ''
+          },
+          opencode: {
+            hint: 'server hint'
+          }
+        }
       },
       global: {
         stubs: {
@@ -49,5 +86,67 @@ describe('UseKeyModal', () => {
     expect(codeBlock.exists()).toBe(true)
     expect(codeBlock.text()).toContain('"name": "GPT-5.4 Mini"')
     expect(codeBlock.text()).toContain('"name": "GPT-5.4 Nano"')
+    expect(codeBlock.text()).toContain('"baseURL": "https://dynamic.example.com/v1"')
+    expect(wrapper.text()).toContain('server hint')
+  })
+
+  it('prefers server-provided no-group copy over i18n defaults', () => {
+    const wrapper = mount(UseKeyModal, {
+      props: {
+        show: true,
+        apiKey: 'sk-test',
+        baseUrl: 'https://example.com/v1',
+        platform: null,
+        usageGuideContent: {
+          description: '',
+          note: '',
+          no_group_title: 'Assign a group first',
+          no_group_description: 'The latest copy comes from the server.',
+          openai: {
+            description: '',
+            config_toml_hint: '',
+            note: '',
+            note_windows: '',
+            model_comment: '',
+            claude_note: '',
+            gemini_note: ''
+          },
+          gemini: {
+            description: '',
+            config_toml_hint: '',
+            note: '',
+            note_windows: '',
+            model_comment: '',
+            claude_note: '',
+            gemini_note: ''
+          },
+          antigravity: {
+            description: '',
+            config_toml_hint: '',
+            note: '',
+            note_windows: '',
+            model_comment: '',
+            claude_note: '',
+            gemini_note: ''
+          },
+          opencode: {
+            hint: ''
+          }
+        }
+      },
+      global: {
+        stubs: {
+          BaseDialog: {
+            template: '<div><slot /><slot name="footer" /></div>'
+          },
+          Icon: {
+            template: '<span />'
+          }
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Assign a group first')
+    expect(wrapper.text()).toContain('The latest copy comes from the server.')
   })
 })

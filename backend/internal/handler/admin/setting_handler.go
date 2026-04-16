@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -152,6 +153,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		RegisterExtraHTML:                    settings.RegisterExtraHTML,
 		PaymentFooterHTML:                    settings.PaymentFooterHTML,
 		GlobalFooterHTML:                     settings.GlobalFooterHTML,
+		APIKeyUsageGuideContent:              settings.APIKeyUsageGuideContent,
 		HideCcsImportButton:                  settings.HideCcsImportButton,
 		PurchaseSubscriptionEnabled:          settings.PurchaseSubscriptionEnabled,
 		PurchaseSubscriptionURL:              settings.PurchaseSubscriptionURL,
@@ -267,25 +269,26 @@ type UpdateSettingsRequest struct {
 	OIDCConnectUserInfoUsernamePath string `json:"oidc_connect_userinfo_username_path"`
 
 	// OEM设置
-	SiteName                    string                `json:"site_name"`
-	SiteLogo                    string                `json:"site_logo"`
-	SiteSubtitle                string                `json:"site_subtitle"`
-	APIBaseURL                  string                `json:"api_base_url"`
-	ContactInfo                 string                `json:"contact_info"`
-	DocURL                      string                `json:"doc_url"`
-	HomeContent                 string                `json:"home_content"`
-	CustomCSS                   string                `json:"custom_css"`
-	LoginExtraHTML              string                `json:"login_extra_html"`
-	RegisterExtraHTML           string                `json:"register_extra_html"`
-	PaymentFooterHTML           string                `json:"payment_footer_html"`
-	GlobalFooterHTML            string                `json:"global_footer_html"`
-	HideCcsImportButton         bool                  `json:"hide_ccs_import_button"`
-	PurchaseSubscriptionEnabled *bool                 `json:"purchase_subscription_enabled"`
-	PurchaseSubscriptionURL     *string               `json:"purchase_subscription_url"`
-	TableDefaultPageSize        int                   `json:"table_default_page_size"`
-	TablePageSizeOptions        []int                 `json:"table_page_size_options"`
-	CustomMenuItems             *[]dto.CustomMenuItem `json:"custom_menu_items"`
-	CustomEndpoints             *[]dto.CustomEndpoint `json:"custom_endpoints"`
+	SiteName                    string                          `json:"site_name"`
+	SiteLogo                    string                          `json:"site_logo"`
+	SiteSubtitle                string                          `json:"site_subtitle"`
+	APIBaseURL                  string                          `json:"api_base_url"`
+	ContactInfo                 string                          `json:"contact_info"`
+	DocURL                      string                          `json:"doc_url"`
+	HomeContent                 string                          `json:"home_content"`
+	CustomCSS                   string                          `json:"custom_css"`
+	LoginExtraHTML              string                          `json:"login_extra_html"`
+	RegisterExtraHTML           string                          `json:"register_extra_html"`
+	PaymentFooterHTML           string                          `json:"payment_footer_html"`
+	GlobalFooterHTML            string                          `json:"global_footer_html"`
+	APIKeyUsageGuideContent     service.APIKeyUsageGuideContent `json:"api_key_usage_guide_content"`
+	HideCcsImportButton         bool                            `json:"hide_ccs_import_button"`
+	PurchaseSubscriptionEnabled *bool                           `json:"purchase_subscription_enabled"`
+	PurchaseSubscriptionURL     *string                         `json:"purchase_subscription_url"`
+	TableDefaultPageSize        int                             `json:"table_default_page_size"`
+	TablePageSizeOptions        []int                           `json:"table_page_size_options"`
+	CustomMenuItems             *[]dto.CustomMenuItem           `json:"custom_menu_items"`
+	CustomEndpoints             *[]dto.CustomEndpoint           `json:"custom_endpoints"`
 
 	// 默认配置
 	DefaultConcurrency   int                              `json:"default_concurrency"`
@@ -855,6 +858,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		RegisterExtraHTML:                req.RegisterExtraHTML,
 		PaymentFooterHTML:                req.PaymentFooterHTML,
 		GlobalFooterHTML:                 req.GlobalFooterHTML,
+		APIKeyUsageGuideContent:          req.APIKeyUsageGuideContent,
 		HideCcsImportButton:              req.HideCcsImportButton,
 		PurchaseSubscriptionEnabled:      purchaseEnabled,
 		PurchaseSubscriptionURL:          purchaseURL,
@@ -1074,6 +1078,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		RegisterExtraHTML:                    updatedSettings.RegisterExtraHTML,
 		PaymentFooterHTML:                    updatedSettings.PaymentFooterHTML,
 		GlobalFooterHTML:                     updatedSettings.GlobalFooterHTML,
+		APIKeyUsageGuideContent:              updatedSettings.APIKeyUsageGuideContent,
 		HideCcsImportButton:                  updatedSettings.HideCcsImportButton,
 		PurchaseSubscriptionEnabled:          updatedSettings.PurchaseSubscriptionEnabled,
 		PurchaseSubscriptionURL:              updatedSettings.PurchaseSubscriptionURL,
@@ -1336,6 +1341,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	}
 	if before.GlobalFooterHTML != after.GlobalFooterHTML {
 		changed = append(changed, "global_footer_html")
+	}
+	if !reflect.DeepEqual(before.APIKeyUsageGuideContent, after.APIKeyUsageGuideContent) {
+		changed = append(changed, "api_key_usage_guide_content")
 	}
 	if before.HideCcsImportButton != after.HideCcsImportButton {
 		changed = append(changed, "hide_ccs_import_button")

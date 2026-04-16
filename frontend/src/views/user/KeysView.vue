@@ -925,8 +925,10 @@
       :show="showUseKeyModal"
       :api-key="selectedKey?.key || ''"
       :base-url="publicSettings?.api_base_url || ''"
+      :dynamic-base-url="useKeyGuideBaseUrl"
       :platform="selectedKey?.group?.platform || null"
       :allow-messages-dispatch="selectedKey?.group?.allow_messages_dispatch || false"
+      :usage-guide-content="useKeyGuideContent"
       @close="closeUseKeyModal"
     />
 
@@ -1068,7 +1070,14 @@ import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 	import GroupBadge from '@/components/common/GroupBadge.vue'
 	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
-	import type { ApiKey, Group, PublicSettings, SubscriptionType, GroupPlatform } from '@/types'
+	import type {
+  ApiKey,
+  ApiKeyUsageGuideContent,
+  Group,
+  PublicSettings,
+  SubscriptionType,
+  GroupPlatform
+} from '@/types'
 import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
@@ -1089,6 +1098,43 @@ interface GroupOption {
   subscriptionType: SubscriptionType
   platform: GroupPlatform
 }
+
+const createEmptyUsageGuideContent = (): ApiKeyUsageGuideContent => ({
+  description: '',
+  note: '',
+  no_group_title: '',
+  no_group_description: '',
+  openai: {
+    description: '',
+    config_toml_hint: '',
+    note: '',
+    note_windows: '',
+    model_comment: '',
+    claude_note: '',
+    gemini_note: ''
+  },
+  gemini: {
+    description: '',
+    config_toml_hint: '',
+    note: '',
+    note_windows: '',
+    model_comment: '',
+    claude_note: '',
+    gemini_note: ''
+  },
+  antigravity: {
+    description: '',
+    config_toml_hint: '',
+    note: '',
+    note_windows: '',
+    model_comment: '',
+    claude_note: '',
+    gemini_note: ''
+  },
+  opencode: {
+    hint: ''
+  }
+})
 
 const appStore = useAppStore()
 const onboardingStore = useOnboardingStore()
@@ -1141,6 +1187,8 @@ const showUseKeyModal = ref(false)
 const showCcsClientSelect = ref(false)
 const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
+const useKeyGuideContent = ref<ApiKeyUsageGuideContent>(createEmptyUsageGuideContent())
+const useKeyGuideBaseUrl = ref('')
 const copiedKeyId = ref<number | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)
@@ -1148,6 +1196,7 @@ const dropdownRef = ref<HTMLElement | null>(null)
 const dropdownPosition = ref<{ top?: number; bottom?: number; left: number } | null>(null)
 const groupButtonRefs = ref<Map<number, HTMLElement>>(new Map())
 let abortController: AbortController | null = null
+let useKeyGuideAbortController: AbortController | null = null
 
 // Get the currently selected key for group change
 const selectedKeyForGroup = computed(() => {
@@ -1359,14 +1408,44 @@ const loadPublicSettings = async () => {
   }
 }
 
+const loadUseKeyGuide = async () => {
+  useKeyGuideAbortController?.abort()
+  const controller = new AbortController()
+  useKeyGuideAbortController = controller
+  useKeyGuideContent.value = createEmptyUsageGuideContent()
+  useKeyGuideBaseUrl.value = ''
+
+  try {
+    const guide = await keysAPI.getUsageGuide({ signal: controller.signal })
+    if (controller.signal.aborted || useKeyGuideAbortController !== controller) {
+      return
+    }
+    useKeyGuideContent.value = guide.content
+    useKeyGuideBaseUrl.value = guide.api_base_url || ''
+  } catch (error) {
+    if (!isAbortError(error)) {
+      console.error('Failed to load API key usage guide:', error)
+    }
+  } finally {
+    if (useKeyGuideAbortController === controller) {
+      useKeyGuideAbortController = null
+    }
+  }
+}
+
 const openUseKeyModal = (key: ApiKey) => {
   selectedKey.value = key
   showUseKeyModal.value = true
+  void loadUseKeyGuide()
 }
 
 const closeUseKeyModal = () => {
+  useKeyGuideAbortController?.abort()
+  useKeyGuideAbortController = null
   showUseKeyModal.value = false
   selectedKey.value = null
+  useKeyGuideContent.value = createEmptyUsageGuideContent()
+  useKeyGuideBaseUrl.value = ''
 }
 
 const handlePageChange = (page: number) => {
@@ -1814,6 +1893,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  abortController?.abort()
+  useKeyGuideAbortController?.abort()
   document.removeEventListener('click', closeGroupSelector)
   if (resetTimer) clearInterval(resetTimer)
 })

@@ -275,6 +275,35 @@ func TestNormalizeOpsErrorType(t *testing.T) {
 	}
 }
 
+func TestParseOpsErrorResponse_ExtractsStructuredCode(t *testing.T) {
+	t.Run("openai_style_string_code", func(t *testing.T) {
+		parsed := parseOpsErrorResponse([]byte(`{"error":{"type":"invalid_request_error","code":"request_body_read_failed","message":"Request body upload was interrupted. Please retry."}}`))
+		require.Equal(t, "invalid_request_error", parsed.ErrorType)
+		require.Equal(t, "request_body_read_failed", parsed.Code)
+		require.Equal(t, "Request body upload was interrupted. Please retry.", parsed.Message)
+	})
+
+	t.Run("google_style_reason_fallback", func(t *testing.T) {
+		parsed := parseOpsErrorResponse([]byte(`{"error":{"code":400,"message":"Request body upload was interrupted. Please retry.","status":"INVALID_ARGUMENT","details":[{"reason":"REQUEST_BODY_READ_FAILED","retry_after_seconds":1}]}}`))
+		require.Equal(t, "api_error", parsed.ErrorType)
+		require.Equal(t, "request_body_read_failed", parsed.Code)
+		require.Equal(t, "Request body upload was interrupted. Please retry.", parsed.Message)
+	})
+}
+
+func TestClassifyOpsIsRetryable_RequestBodyReadFailed(t *testing.T) {
+	require.True(t, classifyOpsIsRetryable("invalid_request_error", http.StatusBadRequest, requestBodyReadFailedCode))
+	require.False(t, classifyOpsIsRetryable("invalid_request_error", http.StatusBadRequest, ""))
+}
+
+func TestParseRetryAfterSeconds(t *testing.T) {
+	require.Nil(t, parseRetryAfterSeconds(""))
+	require.Nil(t, parseRetryAfterSeconds("abc"))
+	require.Nil(t, parseRetryAfterSeconds("-1"))
+	require.NotNil(t, parseRetryAfterSeconds("1"))
+	require.Equal(t, 1, *parseRetryAfterSeconds("1"))
+}
+
 func TestSetOpsEndpointContext_SetsContextKeys(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()

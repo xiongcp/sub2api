@@ -146,6 +146,7 @@ const (
 	SettingKeyRegisterExtraHTML           = "register_extra_html"           // 注册页额外 HTML
 	SettingKeyPaymentFooterHTML           = "payment_footer_html"           // 支付页页脚 HTML
 	SettingKeyGlobalFooterHTML            = "global_footer_html"            // 全局页脚 HTML
+	SettingKeyAPIKeyUsageGuideContent     = "api_key_usage_guide_content"   // API Key 使用说明文案（JSON）
 	SettingKeyHideCcsImportButton         = "hide_ccs_import_button"        // 是否隐藏 API Keys 页面的导入 CCS 按钮
 	SettingKeyPurchaseSubscriptionEnabled = "purchase_subscription_enabled" // 是否展示"购买订阅"页面入口
 	SettingKeyPurchaseSubscriptionURL     = "purchase_subscription_url"     // "购买订阅"页面 URL（作为 iframe src）

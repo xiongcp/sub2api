@@ -116,6 +116,21 @@ func APIKeyFromService(k *service.APIKey) *APIKey {
 	return out
 }
 
+func UserGroupSummaryFromService(g *service.AvailableGroupSummary) *UserGroupSummary {
+	if g == nil {
+		return nil
+	}
+	return &UserGroupSummary{
+		ID:               g.ID,
+		Name:             g.Name,
+		Description:      g.Description,
+		Platform:         g.Platform,
+		RateMultiplier:   g.RateMultiplier,
+		SubscriptionType: g.SubscriptionType,
+		AccessScope:      g.AccessScope,
+	}
+}
+
 func GroupFromServiceShallow(g *service.Group) *Group {
 	if g == nil {
 		return nil

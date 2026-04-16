@@ -51,6 +51,7 @@ func RegisterUserRoutes(
 		keys := authenticated.Group("/keys")
 		{
 			keys.GET("", h.APIKey.List)
+			keys.GET("/usage-guide", h.APIKey.GetUsageGuide)
 			keys.GET("/:id", h.APIKey.GetByID)
 			keys.POST("", h.APIKey.Create)
 			keys.PUT("/:id", h.APIKey.Update)
@@ -60,6 +61,7 @@ func RegisterUserRoutes(
 		// 用户可用分组（非管理员接口）
 		groups := authenticated.Group("/groups")
 		{
+			groups.GET("/available/summary", h.APIKey.GetAvailableGroupSummaries)
 			groups.GET("/available", h.APIKey.GetAvailableGroups)
 			groups.GET("/rates", h.APIKey.GetUserGroupRates)
 		}

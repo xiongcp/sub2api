@@ -4,7 +4,13 @@
  */
 
 import { apiClient } from './client'
-import type { ApiKey, CreateApiKeyRequest, UpdateApiKeyRequest, PaginatedResponse } from '@/types'
+import type {
+  ApiKey,
+  ApiKeyUsageGuideResponse,
+  CreateApiKeyRequest,
+  UpdateApiKeyRequest,
+  PaginatedResponse
+} from '@/types'
 
 /**
  * List all API keys for current user
@@ -42,6 +48,13 @@ export async function list(
  */
 export async function getById(id: number): Promise<ApiKey> {
   const { data } = await apiClient.get<ApiKey>(`/keys/${id}`)
+  return data
+}
+
+export async function getUsageGuide(options?: { signal?: AbortSignal }): Promise<ApiKeyUsageGuideResponse> {
+  const { data } = await apiClient.get<ApiKeyUsageGuideResponse>('/keys/usage-guide', {
+    signal: options?.signal
+  })
   return data
 }
 
@@ -134,6 +147,7 @@ export async function toggleStatus(id: number, status: 'active' | 'inactive'): P
 export const keysAPI = {
   list,
   getById,
+  getUsageGuide,
   create,
   update,
   delete: deleteKey,

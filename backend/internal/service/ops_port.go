@@ -126,8 +126,9 @@ type OpsInsertErrorLogInput struct {
 	RequestBodyBytes     *int
 	RequestHeadersJSON   *string // optional json string
 
-	IsRetryable bool
-	RetryCount  int
+	RetryAfterSeconds *int
+	IsRetryable       bool
+	RetryCount        int
 
 	CreatedAt time.Time
 }

@@ -162,6 +162,86 @@ func TestAPIContracts(t *testing.T) {
 			}`,
 		},
 		{
+			name: "GET /api/v1/keys/usage-guide",
+			setup: func(t *testing.T, deps *contractDeps) {
+				t.Helper()
+				deps.settingRepo.SetAll(map[string]string{
+					service.SettingKeyAPIBaseURL: "https://api.example.com/v1",
+					service.SettingKeyAPIKeyUsageGuideContent: `{
+						"description": "latest description",
+						"note": "retry later",
+						"no_group_title": "assign group first",
+						"no_group_description": "group is required",
+						"openai": {
+							"description": "codex setup",
+							"config_toml_hint": "config first",
+							"note": "openai unix",
+							"note_windows": "openai windows"
+						},
+						"gemini": {
+							"description": "gemini setup",
+							"model_comment": "gemini comment",
+							"note": "gemini note"
+						},
+						"antigravity": {
+							"description": "antigravity setup",
+							"claude_note": "claude note",
+							"gemini_note": "antigravity gemini note"
+						},
+						"opencode": {
+							"hint": "opencode hint"
+						}
+					}`,
+				})
+			},
+			method:     http.MethodGet,
+			path:       "/api/v1/keys/usage-guide",
+			wantStatus: http.StatusOK,
+			wantJSON: `{
+				"code": 0,
+				"message": "success",
+				"data": {
+					"api_base_url": "https://api.example.com/v1",
+					"content": {
+						"description": "latest description",
+						"note": "retry later",
+						"no_group_title": "assign group first",
+						"no_group_description": "group is required",
+						"openai": {
+							"description": "codex setup",
+							"config_toml_hint": "config first",
+							"note": "openai unix",
+							"note_windows": "openai windows",
+							"model_comment": "",
+							"claude_note": "",
+							"gemini_note": ""
+						},
+						"gemini": {
+							"description": "gemini setup",
+							"config_toml_hint": "",
+							"note": "gemini note",
+							"note_windows": "",
+							"model_comment": "gemini comment",
+							"claude_note": "",
+							"gemini_note": ""
+						},
+						"antigravity": {
+							"description": "antigravity setup",
+							"config_toml_hint": "",
+							"note": "",
+							"note_windows": "",
+							"model_comment": "",
+							"claude_note": "claude note",
+							"gemini_note": "antigravity gemini note"
+						},
+						"opencode": {
+							"hint": "opencode hint"
+						}
+					}
+				}
+			}`,
+		},
+		{
 			name: "GET /api/v1/groups/available",
 			setup: func(t *testing.T, deps *contractDeps) {
 				t.Helper()
@@ -217,6 +297,111 @@ func TestAPIContracts(t *testing.T) {
 						"require_privacy_set": false,
 						"created_at": "2025-01-02T03:04:05Z",
 						"updated_at": "2025-01-02T03:04:05Z"
+					}
+				]
+			}`,
+		},
+		{
+			name: "GET /api/v1/groups/available/summary",
+			setup: func(t *testing.T, deps *contractDeps) {
+				t.Helper()
+				deps.userRepo.users[1].AllowedGroups = []int64{11}
+				deps.groupRepo.SetActive([]service.Group{
+					{
+						ID:               10,
+						Name:             "Public Group",
+						Description:      "public-desc",
+						Platform:         service.PlatformAnthropic,
+						RateMultiplier:   1.2,
+						IsExclusive:      false,
+						Status:           service.StatusActive,
+						SubscriptionType: service.SubscriptionTypeStandard,
+						CreatedAt:        deps.now,
+						UpdatedAt:        deps.now,
+					},
+					{
+						ID:                    11,
+						Name:                  "Exclusive Group",
+						Description:           "exclusive-desc",
+						Platform:              service.PlatformOpenAI,
+						RateMultiplier:        2,
+						IsExclusive:           true,
+						Status:                service.StatusActive,
+						SubscriptionType:      service.SubscriptionTypeStandard,
+						AllowMessagesDispatch: true,
+						CreatedAt:             deps.now,
+						UpdatedAt:             deps.now,
+					},
+					{
+						ID:               12,
+						Name:             "Subscription Group",
+						Description:      "subscription-desc",
+						Platform:         service.PlatformGemini,
+						RateMultiplier:   0.8,
+						IsExclusive:      true,
+						Status:           service.StatusActive,
+						SubscriptionType: service.SubscriptionTypeSubscription,
+						DailyLimitUSD:    ptr(10.0),
+						CreatedAt:        deps.now,
+						UpdatedAt:        deps.now,
+					},
+					{
+						ID:               13,
+						Name:             "Hidden Exclusive Group",
+						Description:      "hidden-desc",
+						Platform:         service.PlatformAntigravity,
+						RateMultiplier:   3,
+						IsExclusive:      true,
+						Status:           service.StatusActive,
+						SubscriptionType: service.SubscriptionTypeStandard,
+						CreatedAt:        deps.now,
+						UpdatedAt:        deps.now,
+					},
+				})
+				deps.userSubRepo.SetActiveByUserID(1, []service.UserSubscription{
+					{
+						ID:        1001,
+						UserID:    1,
+						GroupID:   12,
+						Status:    service.SubscriptionStatusActive,
+						StartsAt:  deps.now,
+						ExpiresAt: deps.now.Add(24 * time.Hour),
+					},
+				})
+			},
+			method:     http.MethodGet,
+			path:       "/api/v1/groups/available/summary",
+			wantStatus: http.StatusOK,
+			wantJSON: `{
+				"code": 0,
+				"message": "success",
+				"data": [
+					{
+						"id": 10,
+						"name": "Public Group",
+						"description": "public-desc",
+						"platform": "anthropic",
+						"rate_multiplier": 1.2,
+						"subscription_type": "standard",
+						"access_scope": "public"
+					},
+					{
+						"id": 11,
+						"name": "Exclusive Group",
+						"description": "exclusive-desc",
+						"platform": "openai",
+						"rate_multiplier": 2,
+						"subscription_type": "standard",
+						"access_scope": "exclusive"
+					},
+					{
+						"id": 12,
+						"name": "Subscription Group",
+						"description": "subscription-desc",
+						"platform": "gemini",
+						"rate_multiplier": 0.8,
+						"subscription_type": "subscription",
+						"access_scope": "subscription"
 					}
 				]
 			}`,
@@ -585,6 +770,42 @@ func TestAPIContracts(t *testing.T) {
 					"register_extra_html": "",
 					"payment_footer_html": "",
 					"global_footer_html": "",
+					"api_key_usage_guide_content": {
+						"description": "",
+						"note": "",
+						"no_group_title": "",
+						"no_group_description": "",
+						"openai": {
+							"description": "",
+							"config_toml_hint": "",
+							"note": "",
+							"note_windows": "",
+							"model_comment": "",
+							"claude_note": "",
+							"gemini_note": ""
+						},
+						"gemini": {
+							"description": "",
+							"config_toml_hint": "",
+							"note": "",
+							"note_windows": "",
+							"model_comment": "",
+							"claude_note": "",
+							"gemini_note": ""
+						},
+						"antigravity": {
+							"description": "",
+							"config_toml_hint": "",
+							"note": "",
+							"note_windows": "",
+							"model_comment": "",
+							"claude_note": "",
+							"gemini_note": ""
+						},
+						"opencode": {
+							"hint": ""
+						}
+					},
 					"hide_ccs_import_button": false,
 					"purchase_subscription_enabled": false,
 					"purchase_subscription_url": "",
@@ -671,6 +892,7 @@ func TestAPIContracts(t *testing.T) {
 type contractDeps struct {
 	now         time.Time
 	router      http.Handler
+	userRepo    *stubUserRepo
 	apiKeyRepo  *stubApiKeyRepo
 	groupRepo   *stubGroupRepo
 	userSubRepo *stubUserSubscriptionRepo
@@ -734,7 +956,7 @@ func newContractDeps(t *testing.T) *contractDeps {
 
 	adminService := service.NewAdminService(userRepo, groupRepo, &accountRepo, proxyRepo, apiKeyRepo, redeemRepo, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	authHandler := handler.NewAuthHandler(cfg, nil, userService, settingService, nil, redeemService, nil)
-	apiKeyHandler := handler.NewAPIKeyHandler(apiKeyService)
+	apiKeyHandler := handler.NewAPIKeyHandler(apiKeyService, settingService)
 	usageHandler := handler.NewUsageHandler(usageService, apiKeyService)
 	adminSettingHandler := adminhandler.NewSettingHandler(settingService, nil, nil, nil, nil, nil)
 	adminAccountHandler := adminhandler.NewAccountHandler(adminService, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
@@ -767,7 +989,10 @@ func newContractDeps(t *testing.T) *contractDeps {
 	v1Keys := v1.Group("")
 	v1Keys.Use(jwtAuth)
 	v1Keys.GET("/keys", apiKeyHandler.List)
+	v1Keys.GET("/keys/usage-guide", apiKeyHandler.GetUsageGuide)
+	v1Keys.GET("/keys/:id", apiKeyHandler.GetByID)
 	v1Keys.POST("/keys", apiKeyHandler.Create)
+	v1Keys.GET("/groups/available/summary", apiKeyHandler.GetAvailableGroupSummaries)
 	v1Keys.GET("/groups/available", apiKeyHandler.GetAvailableGroups)
 
 	v1Usage := v1.Group("")
@@ -791,6 +1016,7 @@ func newContractDeps(t *testing.T) *contractDeps {
 	return &contractDeps{
 		now:         now,
 		router:      r,
+		userRepo:    userRepo,
 		apiKeyRepo:  apiKeyRepo,
 		groupRepo:   groupRepo,
 		userSubRepo: userSubRepo,

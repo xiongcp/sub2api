@@ -368,6 +368,7 @@ export default {
     logout: 'Logout',
     github: 'GitHub',
     mySubscriptions: 'My Subscriptions',
+    availableGroups: 'Available Groups',
     buySubscription: 'Recharge / Subscription',
     docs: 'Docs',
     myOrders: 'My Orders',
@@ -563,6 +564,35 @@ export default {
   // Groups (shared)
   groups: {
     subscription: 'Sub'
+  },
+
+  userGroups: {
+    title: 'Available Groups',
+    description: 'View the groups available to your account and their basic information.',
+    emptyTitle: 'No available groups',
+    emptyDescription: 'There are no groups available to this account yet. Contact an administrator or activate a subscription.',
+    noDescription: 'No description provided',
+    failedToLoad: 'Failed to load available groups',
+    access: {
+      public: 'Public',
+      exclusive: 'Authorized',
+      subscription: 'Subscription'
+    },
+    type: {
+      standard: 'Standard',
+      subscription: 'Subscription'
+    },
+    fields: {
+      platform: 'Platform',
+      type: 'Type',
+      rate: 'Rate'
+    },
+    platforms: {
+      anthropic: 'Anthropic',
+      openai: 'OpenAI',
+      gemini: 'Gemini',
+      antigravity: 'Antigravity'
+    }
   },
 
   // API Keys
@@ -4546,6 +4576,25 @@ export default {
         globalFooterHtml: 'Global Footer HTML',
         extraHtmlPlaceholder: '<div>Trusted HTML content</div>',
         brandingSlotsWarning: 'Trusted admin content only. HTML is rendered directly and CSS may affect page layout.',
+        apiKeyUsageGuideTitle: 'API Key Usage Guide',
+        apiKeyUsageGuideDescription: 'Edit the copy shown in the "Use API Key" dialog. Changes take effect on the next click without rebuilding the frontend.',
+        apiKeyUsageGuideDescriptionField: 'General Description',
+        apiKeyUsageGuideNoteField: 'General Note',
+        apiKeyUsageGuideNoGroupTitle: 'No Group Title',
+        apiKeyUsageGuideNoGroupDescription: 'No Group Description',
+        apiKeyUsageGuideOpenAI: 'OpenAI / Codex',
+        apiKeyUsageGuideGemini: 'Gemini',
+        apiKeyUsageGuideAntigravity: 'Antigravity',
+        apiKeyUsageGuideOpenCode: 'OpenCode',
+        apiKeyUsageGuideConfigTomlHint: 'config.toml hint',
+        apiKeyUsageGuideModelComment: 'Gemini model comment',
+        apiKeyUsageGuideUnixNote: 'macOS / Linux note',
+        apiKeyUsageGuideWindowsNote: 'Windows note',
+        apiKeyUsageGuideClaudeNote: 'Claude Code note',
+        apiKeyUsageGuideGeminiNote: 'Gemini CLI note',
+        apiKeyUsageGuideHint: 'Hint text',
+        apiKeyUsageGuidePlaceholder: 'Leave empty to keep the built-in default copy.',
+        apiKeyUsageGuideInputPlaceholder: 'Leave empty to keep the built-in default copy.',
         hideCcsImportButton: 'Hide CCS Import Button',
         hideCcsImportButtonHint: 'When enabled, the "Import to CCS" button will be hidden on the API Keys page'
       },

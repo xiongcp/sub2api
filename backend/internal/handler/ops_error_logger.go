@@ -688,7 +688,7 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 				UpstreamErrorDetail:  upstreamErrorDetail,
 				UpstreamErrors:       events,
 
-				IsRetryable: classifyOpsIsRetryable("upstream_error", effectiveUpstreamStatus),
+				IsRetryable: classifyOpsIsRetryable("upstream_error", effectiveUpstreamStatus, ""),
 				RetryCount:  0,
 				CreatedAt:   time.Now(),
 			}
@@ -834,9 +834,10 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 			ErrorSource: errorSource,
 			ErrorOwner:  errorOwner,
 
-			IsRetryable: classifyOpsIsRetryable(normalizedType, status),
-			RetryCount:  0,
-			CreatedAt:   time.Now(),
+			RetryAfterSeconds: parseRetryAfterSeconds(c.Writer.Header().Get("Retry-After")),
+			IsRetryable:       classifyOpsIsRetryable(normalizedType, status, parsed.Code),
+			RetryCount:        0,
+			CreatedAt:         time.Now(),
 		}
 		applyOpsLatencyFieldsFromContext(c, entry)
 
@@ -1039,6 +1040,22 @@ func parseOpsErrorResponse(body []byte) parsedOpsError {
 				code = strconvItoa(int(n))
 			case int:
 				code = strconvItoa(n)
+			case string:
+				code = strings.TrimSpace(n)
+			}
+		}
+		if details, ok := errObj["details"].([]any); ok {
+			for _, item := range details {
+				detailMap, ok := item.(map[string]any)
+				if !ok {
+					continue
+				}
+				reason, _ := detailMap["reason"].(string)
+				reason = strings.ToLower(strings.TrimSpace(reason))
+				if reason != "" {
+					code = reason
+					break
+				}
 			}
 		}
 		return parsedOpsError{ErrorType: t, Message: msg, Code: code}
@@ -1160,7 +1177,11 @@ func classifyOpsSeverity(errType string, status int) string {
 	return "P3"
 }
 
-func classifyOpsIsRetryable(errType string, statusCode int) bool {
+func classifyOpsIsRetryable(errType string, statusCode int, code string) bool {
+	switch strings.TrimSpace(code) {
+	case requestBodyReadFailedCode:
+		return true
+	}
 	switch errType {
 	case "authentication_error", "invalid_request_error":
 		return false
@@ -1176,6 +1197,18 @@ func classifyOpsIsRetryable(errType string, statusCode int) bool {
 	default:
 		return statusCode >= 500
 	}
+}
+
+func parseRetryAfterSeconds(value string) *int {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil || n < 0 {
+		return nil
+	}
+	return &n
 }
 
 func classifyOpsIsBusinessLimited(errType, phase, code string, status int, message string) bool {

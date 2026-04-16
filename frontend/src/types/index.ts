@@ -100,6 +100,36 @@ export interface CustomEndpoint {
   description: string
 }
 
+export interface ApiKeyUsageGuidePlatformContent {
+  description: string
+  config_toml_hint: string
+  note: string
+  note_windows: string
+  model_comment: string
+  claude_note: string
+  gemini_note: string
+}
+
+export interface ApiKeyUsageGuideOpenCodeContent {
+  hint: string
+}
+
+export interface ApiKeyUsageGuideContent {
+  description: string
+  note: string
+  no_group_title: string
+  no_group_description: string
+  openai: ApiKeyUsageGuidePlatformContent
+  gemini: ApiKeyUsageGuidePlatformContent
+  antigravity: ApiKeyUsageGuidePlatformContent
+  opencode: ApiKeyUsageGuideOpenCodeContent
+}
+
+export interface ApiKeyUsageGuideResponse {
+  api_base_url: string
+  content: ApiKeyUsageGuideContent
+}
+
 export interface PublicSettings {
   registration_enabled: boolean
   email_verify_enabled: boolean
@@ -389,6 +419,7 @@ export interface PaginationConfig {
 export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity'
 
 export type SubscriptionType = 'standard' | 'subscription'
+export type UserGroupAccessScope = 'public' | 'exclusive' | 'subscription'
 
 export interface OpenAIMessagesDispatchModelConfig {
   opus_mapped_model?: string
@@ -425,6 +456,16 @@ export interface Group {
   require_privacy_set: boolean
   created_at: string
   updated_at: string
+}
+
+export interface UserGroupSummary {
+  id: number
+  name: string
+  description: string | null
+  platform: GroupPlatform
+  rate_multiplier: number
+  subscription_type: SubscriptionType
+  access_scope: UserGroupAccessScope
 }
 
 export interface AdminGroup extends Group {

@@ -4,7 +4,12 @@
  */
 
 import { apiClient } from '../client'
-import type { CustomMenuItem, CustomEndpoint, NotifyEmailEntry } from '@/types'
+import type {
+  ApiKeyUsageGuideContent,
+  CustomMenuItem,
+  CustomEndpoint,
+  NotifyEmailEntry
+} from '@/types'
 
 export interface DefaultSubscriptionSetting {
   group_id: number
@@ -44,6 +49,7 @@ export interface SystemSettings {
   register_extra_html: string
   payment_footer_html: string
   global_footer_html: string
+  api_key_usage_guide_content: ApiKeyUsageGuideContent
   hide_ccs_import_button: boolean
   table_default_page_size: number
   table_page_size_options: number[]
@@ -178,6 +184,7 @@ export interface UpdateSettingsRequest {
   register_extra_html?: string
   payment_footer_html?: string
   global_footer_html?: string
+  api_key_usage_guide_content?: ApiKeyUsageGuideContent
   hide_ccs_import_button?: boolean
   table_default_page_size?: number
   table_page_size_options?: number[]

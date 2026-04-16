@@ -30,3 +30,10 @@ describe('AppSidebar header styles', () => {
     expect(sidebarBrandBlockMatch?.[0]).not.toContain('overflow: hidden;')
   })
 })
+
+describe('AppSidebar user navigation', () => {
+  it('includes the available groups entry for user-facing navigation', () => {
+    expect(componentSource).toContain("path: '/groups'")
+    expect(componentSource).toContain("t('nav.availableGroups')")
+  })
+})

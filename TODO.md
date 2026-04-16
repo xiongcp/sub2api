@@ -1,4 +1,116 @@
 ## Goal
+- 将版本号更新为 `0.1.114-rc1`，并构建、推送 `chengpengxiong/sub2api:0.1.114-rc1` Docker 镜像。
+
+## Todo
+- 无。
+
+## Doing
+- 无。
+
+## Done
+- 已确认当前版本文件为 `0.1.113-rc1`，最新 git tag 也是 `v0.1.113-rc1`。
+- 已确认主 Dockerfile 支持通过构建参数或 `backend/cmd/server/VERSION` 注入版本号。
+- 已决定 RC 版本只推送 `chengpengxiong/sub2api:0.1.114-rc1`，不覆盖 `latest`。
+- 已将 `backend/cmd/server/VERSION` 更新为 `0.1.114-rc1`。
+- 已重新执行 `go generate`，确认 `OAuthRefreshAPI` 的 Wire provider 缺口已修复，`wire_gen.go` 可重新生成。
+- 已完成镜像构建并推送 `chengpengxiong/sub2api:0.1.114-rc1`，推送 digest 为 `sha256:7e47d8cd47b3230c36f03590ad559da7592b0e04e96c747511caba2c4b1caf12`。
+
+## Validation
+- `cd backend/cmd/server && go generate`
+- `cd backend && go test ./cmd/server`
+- `cd backend && go test -tags unit ./internal/service -run 'TestSettingService_(GetAPIKeyUsageGuide|GetPublicSettings|GetFrontendURL|UpdateSettings_)'`
+- `docker build -t chengpengxiong/sub2api:0.1.114-rc1 --build-arg VERSION=0.1.114-rc1 --build-arg COMMIT=66630cb6 --build-arg DATE=2026-04-16T05:03:35Z --build-arg GOPROXY=https://goproxy.cn,direct --build-arg GOSUMDB=sum.golang.google.cn -f Dockerfile .`
+- `docker push chengpengxiong/sub2api:0.1.114-rc1`
+
+## Risks
+- 工作区当前为脏树，本轮只更新版本文件并执行镜像构建/推送，不处理其他未提交改动。
+- 未额外创建 git tag 或推送代码；当前只完成了本地版本更新和 Docker 镜像发布。
+
+## Next Steps
+- 如需让仓库版本和镜像版本对外一致，下一步应提交版本变更并按仓库约定创建/推送对应 git tag。
+
+## Goal
+- 修复 `Wire` 无法为 `OAuthRefreshAPI` 自动生成依赖注入代码的问题，消除 `no provider found for []time.Duration` 报错，同时保持现有默认刷新锁 TTL 逻辑不变。
+
+## Todo
+- 为 `OAuthRefreshAPI` 增加固定参数的 Wire provider 包装函数。
+- 替换 `service.ProviderSet` 中对 variadic 构造函数的直接注册。
+- 重新生成 `wire_gen.go` 并验证编译。
+
+## Doing
+- 正在修复 `OAuthRefreshAPI` 的 Wire provider 缺口并验证 `go generate`。
+
+## Done
+- 已确认根因是 `NewOAuthRefreshAPI(accountRepo, tokenCache, lockTTL ...time.Duration)` 的 variadic 参数会被 Wire 解析成缺失的 `[]time.Duration` provider。
+- 已确认当前运行逻辑仍依赖两参默认调用，问题集中在代码生成阶段而非运行时行为。
+
+## Validation
+- 待补充。
+
+## Risks
+- 工作区当前为脏树，本轮只处理 `OAuthRefreshAPI` 的 Wire 注入缺口，不扩修无关依赖链。
+
+## Next Steps
+- 修复完成后执行 `go generate`、`go test ./cmd/server` 并更新本节状态。
+
+## Goal
+- 为设置类只读接口补充 `L1 + Redis L2` 两级缓存，覆盖公开设置、API Key 使用说明和前端 URL，减少数据库读取压力，并在设置更新后主动失效。
+
+## Todo
+- 无。
+
+## Doing
+- 无。
+
+## Done
+- 已确认仓库已有 Redis、singleflight 和多实例缓存失效先例，当前设置类读取尚未接入统一缓存。
+- 已确认本次最小闭环适合只覆盖 `GetPublicSettings`、`GetAPIKeyUsageGuide` 和 `GetFrontendURL`。
+- 已为 `SettingService` 增加可选 `SettingReadCache` 注入、进程内 L1 缓存、Redis L2 读取以及基于 Pub/Sub 的本地缓存失效订阅。
+- 已让 `GetPublicSettings`、`GetAPIKeyUsageGuide` 和 `GetFrontendURL` 优先命中 L1，再查 Redis，最后才回源数据库。
+- 已在 `UpdateSettings` 成功写库后主动清理本机 L1、删除 Redis bundle key，并发布失效消息，避免只靠 TTL 被动过期。
+- 已新增 `backend/internal/repository/setting_read_cache.go` 并接入 Wire，同时手动同步 `backend/cmd/server/wire_gen.go` 中的 `SettingService` 注入参数。
+- 已新增设置读取缓存单测，覆盖首次回源、Redis 命中和更新后失效重载场景。
+
+## Validation
+- `cd backend && go test -tags unit ./internal/service -run 'TestSettingService_(GetAPIKeyUsageGuide|GetPublicSettings|GetFrontendURL|UpdateSettings_)'`
+- `cd backend && go test ./cmd/server`
+- `cd backend && go test ./internal/repository -run '^$'`
+- `git diff --check -- backend/internal/service/setting_service.go backend/internal/service/wire.go backend/internal/repository/setting_read_cache.go backend/internal/repository/wire.go backend/internal/service/setting_service_read_cache_test.go backend/cmd/server/wire_gen.go TODO.md`
+
+## Risks
+- 工作区当前为脏树，需严格限制改动范围，只处理设置读取缓存相关代码。
+- `wire` 生成当前仍受工作区内另一条既有 DI 缺口影响：`initializeApplication` 缺少 `[]time.Duration` provider；本轮仅手动同步了 `SettingService` 相关的 `wire_gen.go` 调用，不扩修无关依赖链。
+
+## Next Steps
+- 如果后续要继续降低数据库压力，下一步优先把其他 `SettingService` 的只读入口按同样 bundle 方式接入，而不是直接做全站通用缓存框架。
+
+## Goal
+- 在关闭 Turnstile 后重启线上 `cc.taylor-link.xyz` 的应用容器，并确认公网配置与健康检查恢复正常。
+
+## Todo
+- 无。
+
+## Doing
+- 无。
+
+## Done
+- 已通过 `ssh taylor@34.92.180.210` 确认线上为 `/mnt/data/sub2api/docker-compose.yml` 的 Docker 部署，服务名为 `sub2api`。
+- 已执行 `docker compose restart sub2api` 重启应用容器。
+- 已确认重启后容器重新进入 `healthy` 状态。
+- 已确认公网 `https://cc.taylor-link.xyz/api/v1/settings/public` 返回 `turnstile_enabled=false`。
+
+## Validation
+- `ssh taylor@34.92.180.210 'cd /mnt/data/sub2api && docker compose restart sub2api && docker compose ps sub2api'`
+- `curl -fsS 'https://cc.taylor-link.xyz/api/v1/settings/public?timezone=Asia%2FShanghai'`
+- `curl -fsS https://cc.taylor-link.xyz/health`
+
+## Risks
+- 当前虽然 `turnstile_enabled=false`，但公网设置里仍保留了 `turnstile_site_key` 字段；只要前端严格以 `turnstile_enabled` 为开关就不会生效，但若后续有错误依赖 site key 的逻辑，仍需继续检查。
+
+## Next Steps
+- 如需进一步确认大陆可用性，下一步应实测登录/注册页是否已完全不再加载 Turnstile 相关脚本或组件。
+
+## Goal
 - 优化默认 branding 的自定义 CSS 与辅助文案结构，在保持简洁风格的前提下强化 Google 风格的层级、节奏与品牌识别。
 
 ## Todo
@@ -247,3 +359,138 @@
 
 ## Next Steps
 - 若要真正修复，应该在 OpenAI 网关的 JSON/SSE usage 解析里补齐 `cache_creation_input_tokens`，并在上游返回 TTL 明细时一并解析 `cache_creation.ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens`。
+
+## Goal
+- 将 `upstream/main@be7551b9` 合入当前本地 `main`，保留本地既有修复与 branding 改动，并吸收上游支付、账号成本、SSE 关闭与 OpenAI 限流修复。
+
+## Todo
+- 无。
+
+## Doing
+- 无。
+
+## Done
+- 已在隔离 worktree 上执行真实 `git merge upstream/main`，并将结果快进到当前本地 `main`，当前 `HEAD` 为合并提交 `66630cb6`。
+- 已吸收上游支付充值倍率 / 手续费率、账号成本展示、账号测试 SSE 可关闭，以及 OpenAI 账号限流回流修复相关改动。
+- 已保留本地 `backend/cmd/server/VERSION` 为 `0.1.113-rc1`，未跟随上游改成正式版 `0.1.113`。
+- 已保留本地既有 branding 与其他历史修复；自动合并未产生除 `VERSION` 以外的文本冲突。
+- 已补一个最小稳定性修复：`frontend/src/views/admin/DashboardView.vue` 的 `formatCost()` 现在可处理 `undefined/null`，避免新引入的 `account_cost` 字段在旧 mock/旧数据下触发渲染异常。
+- 已清理临时合并 worktree 与临时分支，未把验证用 `node_modules` 软链混入仓库。
+
+## Validation
+- `git fetch upstream main`
+- `git merge --ff-only codex/merge-upstream-main`
+- `cd /tmp/sub2api-merge/backend && go test -tags unit ./internal/service/... ./internal/handler/... ./internal/server/...`
+- `cd /tmp/sub2api-merge/frontend && COREPACK_ENABLE_AUTO_PIN=0 pnpm test:run src/components/account src/views/admin src/views/user src/constants`
+- `cd /tmp/sub2api-merge/frontend && COREPACK_ENABLE_AUTO_PIN=0 pnpm lint:check`
+- `cd /tmp/sub2api-merge/frontend && COREPACK_ENABLE_AUTO_PIN=0 pnpm typecheck`
+- `cd /tmp/sub2api-merge && make test` 失败于环境缺少 `golangci-lint`，不是代码测试失败。
+
+## Risks
+- 工作区仍保留与本任务无关的现有改动：`TODO.md`、`frontend/package.json`、`.playwright-mcp/`；提交本次合并时需要注意不要误混入。
+- `Antigravity-Manager` gitlink 目前随 `upstream/main` 一并进入本地分支；上游树当前就是这个状态，本轮未额外清理。
+- `make test` 依赖本机安装 `golangci-lint`；当前仅能确认 Go 测试、前端测试、前端 lint/typecheck 通过，不能声称完整 CI 基线已在本机跑通。
+
+## Next Steps
+- 如要提交本次结果，先明确是否保留 `Antigravity-Manager` gitlink，再决定是否额外做一次清理提交。
+- 如要补全本地 CI 验证，先安装 `golangci-lint` 后重新执行 `make test`。
+
+## Goal
+- 修复用户端无法查看可用分组的问题，让用户可以直接看到自己可使用的分组，并且只暴露基础信息。
+
+## Todo
+- 无。
+
+## Doing
+- 无。
+
+## Done
+- 已确认现有后端已具备“按用户权限过滤可用分组”的能力，但仅被 `KeysView` 内部下拉框使用，用户侧没有独立入口。
+- 已新增用户侧摘要接口 `GET /api/v1/groups/available/summary`，复用现有权限判断，仅返回 `id/name/description/platform/rate_multiplier/subscription_type/access_scope`。
+- 已保持现有 `GET /api/v1/groups/available` 不变，避免影响 `frontend/src/views/user/KeysView.vue` 现有分组切换与 `allow_messages_dispatch` 相关逻辑。
+- 已新增用户页 [GroupsView.vue](/root/sub2api/frontend/src/views/user/GroupsView.vue)，用户可以在侧边栏直接查看当前账号可使用的分组、分组类型、平台、倍率和可用资格说明。
+- 已在 [AppSidebar.vue](/root/sub2api/frontend/src/components/layout/AppSidebar.vue) 和 [router/index.ts](/root/sub2api/frontend/src/router/index.ts) 增加用户侧“可用分组”入口与路由。
+- 已补充后端合约测试和前端视图/导航测试，覆盖摘要接口的权限过滤和用户入口可见性。
+
+## Validation
+- `cd backend && go test -tags unit ./internal/server -run 'TestAPIContracts'`
+- `cd frontend && COREPACK_ENABLE_AUTO_PIN=0 pnpm test:run src/views/user/__tests__/GroupsView.spec.ts src/components/layout/__tests__/AppSidebar.spec.ts`
+- `cd frontend && COREPACK_ENABLE_AUTO_PIN=0 pnpm typecheck`
+- `cd frontend && COREPACK_ENABLE_AUTO_PIN=0 pnpm lint:check`
+
+## Risks
+- 当前新增的是“摘要接口 + 独立页面”，未把老的 `/groups/available` 一并收窄；这是刻意保留兼容性，意味着短期内用户侧仍存在一条更宽的历史接口供 `KeysView` 使用。
+- `TODO.md`、`frontend/package.json` 与 `.playwright-mcp/` 在本轮开始前就已经是脏工作区状态，提交时仍需注意不要误混入无关改动。
+
+## Next Steps
+- 如果后续希望进一步收紧用户侧数据暴露，可以再评估把 `KeysView` 逐步迁移到更细粒度的类型，而不是继续复用宽 `Group` DTO。
+- 如果希望用户更容易理解“为什么我能用这个分组”，下一步可以在页面上补一段资格说明文案，但本轮先保持最小可用实现。
+
+## Goal
+- 为网关请求体读取失败补最小可观测性，并把这类失败统一收敛成可重试的 JSON 错误提示，避免 API 用户看到笼统的 body read 失败文案。
+
+## Todo
+- 无。
+
+## Doing
+- 无。
+
+## Done
+- 已新增统一的请求体读取失败处理 helper，覆盖 OpenAI / Anthropic / Claude-compatible / Gemini 入口，响应中统一附带 `Retry-After: 1`，并返回明确的“请重试” JSON 文案。
+- 已为 OpenAI / Anthropic / Claude-compatible 错误体补充稳定的 `error.code=request_body_read_failed`；Gemini 兼容错误体补充 `details.reason=REQUEST_BODY_READ_FAILED` 与 `retry_after_seconds=1`。
+- 已为这类失败补充结构化日志，记录底层读流错误、路径、方法、`content_length`、`transfer_encoding`、`content_type`、`user_agent` 与客户端 IP，不记录原始请求体。
+- 已让 `ops_error_logs` 识别这类错误码并标记为 `is_retryable=true`，同时把响应头里的 `Retry-After` 落入 `retry_after_seconds`。
+- 已将仓库内 `deploy/Caddyfile` 的 API 错误页示例改为 JSON，避免受管 Caddy 部署在代理层返回纯文本错误页。
+- 已补充 handler 单测，覆盖返回格式、`Retry-After`、错误码提取和 retryable 分类。
+
+## Validation
+- `cd backend && go test -tags unit ./internal/handler -run 'Test(HandleRetryableRequestBodyReadError|ParseOpsErrorResponse_ExtractsStructuredCode|ClassifyOpsIsRetryable_RequestBodyReadFailed|ParseRetryAfterSeconds|ReadRequestBodyWithPrealloc|ReadRequestBodyWithPrealloc_MaxBytesError|OpenAIHandleStreamingAwareError_)'`
+- `cd backend && go test -tags unit ./internal/repository -run 'Test(DoesNotExist)'`
+- `cd backend && go test -tags unit ./internal/service -run 'Test(DoesNotExist)'`
+- `git diff --check -- backend/internal/handler/request_body_read_error.go backend/internal/handler/request_body_read_error_test.go backend/internal/handler/openai_gateway_handler.go backend/internal/handler/openai_chat_completions.go backend/internal/handler/gateway_handler.go backend/internal/handler/gateway_handler_responses.go backend/internal/handler/gateway_handler_chat_completions.go backend/internal/handler/gemini_v1beta_handler.go backend/internal/handler/ops_error_logger.go backend/internal/handler/ops_error_logger_test.go backend/internal/service/ops_port.go backend/internal/repository/ops_repo.go deploy/Caddyfile`
+- `caddy` 本地二进制缺失；尝试用 Docker `caddy:2.10.0` 做 `caddy adapt` 校验时因拉镜像网络超时失败，Caddyfile 仅完成静态检查，未完成运行时语法验证。
+
+## Risks
+- 当前仓库不包含线上 Nginx 配置，因此这轮只能保证“应用自己处理到的错误”返回 JSON；如果请求在外层 Nginx 就被拒绝，线上仍需要单独做 API 错误页 JSON 化。
+- `ops_error_logs.retry_after_seconds` 已开始写入，但现有管理端列表/详情还没有专门展示这个字段；当前主要用于分类与后续排查。
+- 工作区里仍有本任务之外的脏改动，提交时要避免混入 `frontend/package.json`、`.playwright-mcp/` 以及上一轮未提交的用户分组改动。
+
+## Next Steps
+- 如需彻底消灭线上 HTML 错误页，需要把同样的 API 错误页 JSON 化策略落到实际使用的 Nginx 配置。
+- 如需让客户端更容易自动重试，可以后续再评估是否补充额外的显式重试头或 SDK 侧重试规则，但本轮先保持 `Retry-After + stable error.code`。
+
+## Goal
+- 将“使用 API 密钥”按钮对应的说明从前端静态文案改为管理员可编辑，并让用户点击时动态请求最新配置，避免每次改文案都重新打包上线。
+
+## Todo
+- 无。
+
+## Doing
+- 无。
+
+## Done
+- 已在后端新增专用接口 `GET /api/v1/keys/usage-guide`，返回最新 `api_base_url` 与结构化的 API Key 使用说明文案。
+- 已在设置域模型中新增 `api_key_usage_guide_content`，支持初始化默认值、管理后台保存、读取解析与审计差异记录。
+- 已在管理后台“站点设置”中新增 API Key 使用说明编辑区，管理员可直接编辑通用说明、未分组提示、OpenAI / Gemini / Antigravity / OpenCode 的基础文案。
+- 已把用户侧 [UseKeyModal.vue](/root/sub2api/frontend/src/components/keys/UseKeyModal.vue) 改为优先使用后端动态文案，并在缺失字段时回退到现有 i18n 默认值。
+- 已把用户侧 [KeysView.vue](/root/sub2api/frontend/src/views/user/KeysView.vue) 改为点击“使用 API 密钥”后动态请求最新说明，并在关闭弹窗或组件卸载时中止未完成请求。
+- 已保持生成配置文件/代码片段的逻辑仍在前端，只把需要频繁调整的说明文案与 `api_base_url` 动态化，控制改动范围。
+- 已补充后端单测与接口合约测试，并补充前端弹窗测试覆盖服务端文案覆盖和动态 base URL 生效。
+
+## Validation
+- `cd backend && go test -tags unit ./internal/service -run 'TestSettingService_(GetAPIKeyUsageGuide|ParseAPIKeyUsageGuideContent_InvalidJSONReturnsEmpty|GetPublicSettings)'`
+- `cd backend && go test -tags unit ./internal/server -run 'TestAPIContracts'`
+- `cd backend && go test -tags unit ./...`
+- `cd frontend && pnpm test:run src/components/keys/__tests__/UseKeyModal.spec.ts`
+- `cd frontend && pnpm typecheck`
+- `cd frontend && pnpm exec eslint src/api/admin/settings.ts src/api/keys.ts src/components/keys/UseKeyModal.vue src/components/keys/__tests__/UseKeyModal.spec.ts src/types/index.ts src/views/admin/SettingsView.vue src/views/user/KeysView.vue src/i18n/locales/en.ts src/i18n/locales/zh.ts`
+- `cd frontend && pnpm build`
+
+## Risks
+- 当前后端存储的是一份统一文案，不区分多语言；如果后续需要中英文分别维护，需要再扩展数据结构和管理界面。
+- 本轮刻意没有把这份说明并入 `GET /api/v1/settings/public`，而是只通过已登录用户专用接口返回，以减少无关暴露面。
+- 工作区仍存在本任务之外的既有脏改动，如用户分组页、请求体读流错误处理、`frontend/package.json`、`.playwright-mcp/` 等，提交时需要谨慎选择文件。
+
+## Next Steps
+- 如果后续希望支持多语言管理员文案，下一步应先确定是否采用“按 locale 存整份文案”还是“字段级多语言对象”的数据模型。
+- 如果希望用户打开弹窗时有更明确的加载反馈，可以再补一个轻量 loading 态，但本轮先保持最小改动。

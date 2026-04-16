@@ -126,7 +126,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			h.errorResponse(c, http.StatusRequestEntityTooLarge, "invalid_request_error", buildBodyTooLargeMessage(maxErr.Limit))
 			return
 		}
-		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to read request body")
+		handleRetryableRequestBodyReadError(c, reqLog, err, apiErrorFormatOpenAI)
 		return
 	}
 
@@ -538,7 +538,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			h.anthropicErrorResponse(c, http.StatusRequestEntityTooLarge, "invalid_request_error", buildBodyTooLargeMessage(maxErr.Limit))
 			return
 		}
-		h.anthropicErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to read request body")
+		handleRetryableRequestBodyReadError(c, reqLog, err, apiErrorFormatAnthropic)
 		return
 	}
 	if len(body) == 0 {

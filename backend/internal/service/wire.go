@@ -39,6 +39,13 @@ func ProvideEmailQueueService(emailService *EmailService) *EmailQueueService {
 	return NewEmailQueueService(emailService, 3)
 }
 
+// ProvideOAuthRefreshAPI creates OAuthRefreshAPI with default lock TTL.
+// Wire cannot infer variadic parameters, so the provider keeps the constructor unchanged
+// while exposing a fixed-arity entrypoint for DI generation.
+func ProvideOAuthRefreshAPI(accountRepo AccountRepository, tokenCache GeminiTokenCache) *OAuthRefreshAPI {
+	return NewOAuthRefreshAPI(accountRepo, tokenCache)
+}
+
 // ProvideTokenRefreshService creates and starts TokenRefreshService
 func ProvideTokenRefreshService(
 	accountRepo AccountRepository,
@@ -374,13 +381,21 @@ func ProvideBackupService(
 }
 
 // ProvideSettingService wires SettingService with group reader and proxy repo.
-func ProvideSettingService(settingRepo SettingRepository, groupRepo GroupRepository, proxyRepo ProxyRepository, cfg *config.Config) (*SettingService, error) {
+func ProvideSettingService(
+	settingRepo SettingRepository,
+	groupRepo GroupRepository,
+	proxyRepo ProxyRepository,
+	readCache SettingReadCache,
+	cfg *config.Config,
+) (*SettingService, error) {
 	svc := NewSettingService(settingRepo, cfg)
 	svc.SetDefaultSubscriptionGroupReader(groupRepo)
 	svc.SetProxyRepository(proxyRepo)
+	svc.SetReadCache(readCache)
 	if err := svc.InitializeDefaultSettings(context.Background()); err != nil {
 		return nil, err
 	}
+	svc.StartReadCacheInvalidationSubscriber(context.Background())
 	return svc, nil
 }
 
@@ -412,7 +427,7 @@ var ProviderSet = wire.NewSet(
 	NewCompositeTokenCacheInvalidator,
 	wire.Bind(new(TokenCacheInvalidator), new(*CompositeTokenCacheInvalidator)),
 	NewAntigravityOAuthService,
-	NewOAuthRefreshAPI,
+	ProvideOAuthRefreshAPI,
 	ProvideGeminiTokenProvider,
 	NewGeminiMessagesCompatService,
 	ProvideAntigravityTokenProvider,
