@@ -1,4 +1,32 @@
 ## Goal
+- 提交 `UseKeyModal.vue` 的本地改动，忽略 `.playwright-mcp/` 调试产物，发布正式版 `v0.1.114`，并推送 `chengpengxiong/sub2api:0.1.114` 与 `latest` 镜像。
+
+## Todo
+- 验证工作区只包含预期文件。
+- 运行 `UseKeyModal` 目标测试。
+- 提交代码并推送 `origin/main`。
+- 打并推送 git tag `v0.1.114`。
+- 构建并推送 Docker 镜像标签 `0.1.114` 和 `latest`。
+
+## Doing
+- 正在落地 `.gitignore`、版本号和发布前验证。
+
+## Done
+- 已确认当前工作区只包含 `frontend/src/components/keys/UseKeyModal.vue` 和 `.playwright-mcp/` 调试产物。
+- 已确认 `UseKeyModal.vue` 当前变更仅将两处 `model_context_window`/`model_auto_compact_token_limit` 配置从 `1000000/900000` 调整为 `200000/190000`。
+- 已确认发布策略为正式版 `0.1.114`，Docker 同步推送 `chengpengxiong/sub2api:0.1.114` 与 `chengpengxiong/sub2api:latest`。
+
+## Validation
+- 待补充。
+
+## Risks
+- `.playwright-mcp/` 为本地调试产物，不应纳入本次提交。
+- 当前仓库历史上已存在 `0.1.114-rc1` 版本文件和镜像，本轮需要确保正式版 tag 与镜像标签一致，避免 RC/正式版混淆。
+
+## Next Steps
+- 完成验证后提交代码、推送分支与 tag，并发布正式版 Docker 镜像。
+
+## Goal
 - 将版本号更新为 `0.1.114-rc1`，并构建、推送 `chengpengxiong/sub2api:0.1.114-rc1` Docker 镜像。
 
 ## Todo
