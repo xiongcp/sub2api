@@ -92,6 +92,8 @@ type SystemSettings struct {
 	SiteSubtitle                string
 	APIBaseURL                  string
 	ContactInfo                 string
+	TopBannerEnabled            bool
+	TopBannerText               string
 	DocURL                      string
 	HomeContent                 string
 	CustomCSS                   string
@@ -177,6 +179,8 @@ type PublicSettings struct {
 	SiteSubtitle                     string
 	APIBaseURL                       string
 	ContactInfo                      string
+	TopBannerEnabled                 bool
+	TopBannerText                    string
 	DocURL                           string
 	HomeContent                      string
 	CustomCSS                        string

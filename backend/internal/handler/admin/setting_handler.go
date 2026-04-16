@@ -146,6 +146,8 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		SiteSubtitle:                         settings.SiteSubtitle,
 		APIBaseURL:                           settings.APIBaseURL,
 		ContactInfo:                          settings.ContactInfo,
+		TopBannerEnabled:                     settings.TopBannerEnabled,
+		TopBannerText:                        settings.TopBannerText,
 		DocURL:                               settings.DocURL,
 		HomeContent:                          settings.HomeContent,
 		CustomCSS:                            settings.CustomCSS,
@@ -274,6 +276,8 @@ type UpdateSettingsRequest struct {
 	SiteSubtitle                string                          `json:"site_subtitle"`
 	APIBaseURL                  string                          `json:"api_base_url"`
 	ContactInfo                 string                          `json:"contact_info"`
+	TopBannerEnabled            bool                            `json:"top_banner_enabled"`
+	TopBannerText               string                          `json:"top_banner_text"`
 	DocURL                      string                          `json:"doc_url"`
 	HomeContent                 string                          `json:"home_content"`
 	CustomCSS                   string                          `json:"custom_css"`
@@ -851,6 +855,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		SiteSubtitle:                     req.SiteSubtitle,
 		APIBaseURL:                       req.APIBaseURL,
 		ContactInfo:                      req.ContactInfo,
+		TopBannerEnabled:                 req.TopBannerEnabled,
+		TopBannerText:                    req.TopBannerText,
 		DocURL:                           req.DocURL,
 		HomeContent:                      req.HomeContent,
 		CustomCSS:                        req.CustomCSS,
@@ -1071,6 +1077,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		SiteSubtitle:                         updatedSettings.SiteSubtitle,
 		APIBaseURL:                           updatedSettings.APIBaseURL,
 		ContactInfo:                          updatedSettings.ContactInfo,
+		TopBannerEnabled:                     updatedSettings.TopBannerEnabled,
+		TopBannerText:                        updatedSettings.TopBannerText,
 		DocURL:                               updatedSettings.DocURL,
 		HomeContent:                          updatedSettings.HomeContent,
 		CustomCSS:                            updatedSettings.CustomCSS,
@@ -1320,6 +1328,12 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	}
 	if before.ContactInfo != after.ContactInfo {
 		changed = append(changed, "contact_info")
+	}
+	if before.TopBannerEnabled != after.TopBannerEnabled {
+		changed = append(changed, "top_banner_enabled")
+	}
+	if before.TopBannerText != after.TopBannerText {
+		changed = append(changed, "top_banner_text")
 	}
 	if before.DocURL != after.DocURL {
 		changed = append(changed, "doc_url")

@@ -115,7 +115,8 @@ func (s *settingReadCacheStub) SubscribeInvalidation(ctx context.Context, handle
 func TestSettingService_GetPublicSettings_UsesReadCacheAfterFirstLoad(t *testing.T) {
 	repo := &settingReadRepoStub{
 		values: map[string]string{
-			SettingKeySiteName: "Cached Site",
+			SettingKeySiteName:      "Cached Site",
+			SettingKeyTopBannerText: "充值联系 cached",
 		},
 	}
 	cache := newSettingReadCacheStub()
@@ -129,6 +130,7 @@ func TestSettingService_GetPublicSettings_UsesReadCacheAfterFirstLoad(t *testing
 
 	require.Equal(t, "Cached Site", first.SiteName)
 	require.Equal(t, "Cached Site", second.SiteName)
+	require.Equal(t, "充值联系 cached", second.TopBannerText)
 	require.Equal(t, 1, repo.getMultipleCalls)
 	_, ok := cache.store[settingReadCacheKeyPublic]
 	require.True(t, ok)
@@ -142,7 +144,8 @@ func TestSettingService_GetPublicSettings_ReadsRedisCacheBeforeRepo(t *testing.T
 	}
 	cache := newSettingReadCacheStub()
 	require.NoError(t, cache.Set(context.Background(), settingReadCacheKeyPublic, &PublicSettings{
-		SiteName: "Redis Site",
+		SiteName:      "Redis Site",
+		TopBannerText: "充值联系 redis",
 	}, time.Minute))
 
 	svc := NewSettingService(repo, &config.Config{})
@@ -151,6 +154,7 @@ func TestSettingService_GetPublicSettings_ReadsRedisCacheBeforeRepo(t *testing.T
 	settings, err := svc.GetPublicSettings(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, "Redis Site", settings.SiteName)
+	require.Equal(t, "充值联系 redis", settings.TopBannerText)
 	require.Equal(t, 0, repo.getMultipleCalls)
 }
 
@@ -174,6 +178,8 @@ func TestSettingService_UpdateSettings_InvalidatesReadCaches(t *testing.T) {
 	repo := &settingReadRepoStub{
 		values: map[string]string{
 			SettingKeySiteName:                  "Old Site",
+			SettingKeyTopBannerEnabled:          "true",
+			SettingKeyTopBannerText:             "旧横幅",
 			SettingKeyAPIBaseURL:                "https://old.example.com/v1",
 			SettingKeyAPIKeyUsageGuideContent:   `{"description":"old"}`,
 			SettingKeyFrontendURL:               "https://old-frontend.example.com",
@@ -196,8 +202,10 @@ func TestSettingService_UpdateSettings_InvalidatesReadCaches(t *testing.T) {
 	require.Equal(t, "https://old-frontend.example.com", svc.GetFrontendURL(context.Background()))
 
 	err = svc.UpdateSettings(context.Background(), &SystemSettings{
-		SiteName:   "New Site",
-		APIBaseURL: "https://new.example.com/v1",
+		SiteName:         "New Site",
+		TopBannerEnabled: true,
+		TopBannerText:    "新横幅",
+		APIBaseURL:       "https://new.example.com/v1",
 		APIKeyUsageGuideContent: APIKeyUsageGuideContent{
 			Description: "new",
 		},
@@ -219,6 +227,8 @@ func TestSettingService_UpdateSettings_InvalidatesReadCaches(t *testing.T) {
 	frontendURL := svc.GetFrontendURL(context.Background())
 
 	require.Equal(t, "New Site", settings.SiteName)
+	require.True(t, settings.TopBannerEnabled)
+	require.Equal(t, "新横幅", settings.TopBannerText)
 	require.Equal(t, "https://new.example.com/v1", guide.APIBaseURL)
 	require.Equal(t, "new", guide.Content.Description)
 	require.Equal(t, "https://new-frontend.example.com", frontendURL)

@@ -1,4 +1,91 @@
 ## Goal
+- 提交当前工作区内已完成的密码重置与顶部横幅改动，推送 `main`，发布正式版 `v0.1.115`，并推送 `chengpengxiong/sub2api:0.1.115` 与 `chengpengxiong/sub2api:latest` 镜像。
+
+## Todo
+- 升级版本号到 `0.1.115` 并整理本轮发布说明。
+- 执行本轮涉及改动的目标测试和脚本校验。
+- 提交代码、推送分支与 git tag `v0.1.115`。
+- 构建并推送 Docker 镜像标签 `0.1.115` 和 `latest`。
+
+## Doing
+- 正在进行发布前校验与版本同步。
+
+## Done
+- 已确认当前 `main`/`origin/main`/`v0.1.114` 指向同一已发布提交，新的未提交改动需要以新版本发布，不能覆盖旧 tag 与旧镜像。
+- 已将 `backend/cmd/server/VERSION` 更新为 `0.1.115`。
+
+## Validation
+- 待补充。
+
+## Risks
+- 当前工作区包含两组功能改动：管理员重置密码会失效旧会话，以及登录后顶部横幅；本轮将作为一次合并发布提交。
+- 若直接沿用 `0.1.114` 发布，会造成版本号、git tag 和 Docker 镜像内容不一致；因此本轮统一提升到 `0.1.115`。
+
+## Next Steps
+- 完成测试、提交、推送和镜像发布后回填本节状态。
+
+## Goal
+- 为登录后页面增加可配置的顶部通知横幅，用于展示“充值联系 xxx”等固定运营消息；消息读取继续复用公开设置缓存，避免额外查询压力。
+
+## Todo
+- 无。
+
+## Doing
+- 无。
+
+## Done
+- 已为后端设置模型、公开设置 DTO、管理端设置更新入口新增 `top_banner_enabled` 与 `top_banner_text` 字段。
+- 已让 `/settings/public` 和 `/api/v1/admin/settings` 读写链路贯通顶部横幅字段，并继续复用现有设置读取缓存。
+- 已在管理端站点设置页增加顶部横幅开关与文案输入框。
+- 已在登录后 `AppHeader` 增加顶部横幅展示、纯文本换行展示和本地关闭缓存。
+- 已新增/更新后端缓存测试、公开设置测试、前端 store 测试和 `AppHeader` 横幅测试。
+- 已同步更新后台接口契约测试，覆盖新增响应字段。
+
+## Validation
+- `git diff --check -- TODO.md backend/internal/service/domain_constants.go backend/internal/service/settings_view.go backend/internal/service/setting_service.go backend/internal/handler/dto/settings.go backend/internal/handler/setting_handler.go backend/internal/handler/admin/setting_handler.go backend/internal/service/setting_service_public_test.go backend/internal/service/setting_service_read_cache_test.go backend/internal/server/api_contract_test.go frontend/src/types/index.ts frontend/src/stores/app.ts frontend/src/api/admin/settings.ts frontend/src/views/admin/SettingsView.vue frontend/src/components/layout/AppHeader.vue frontend/src/stores/__tests__/app.spec.ts frontend/src/components/layout/__tests__/AppHeader.spec.ts frontend/src/i18n/locales/zh.ts frontend/src/i18n/locales/en.ts`
+- `cd backend && go test -tags unit ./internal/service -run 'TestSettingService_(GetPublicSettings|UpdateSettings_)'`
+- `cd backend && go test -tags unit ./internal/server -run 'TestAPIContracts'`
+- `cd frontend && pnpm test:run src/stores/__tests__/app.spec.ts src/components/layout/__tests__/AppHeader.spec.ts`
+
+## Risks
+- 工作区当前为脏树，已有上一条密码重置任务的未提交改动；本轮只追加横幅相关改动，不回退无关文件。
+- 顶部横幅复用 `/settings/public`，因此展示时效仍受现有公开设置缓存与强刷时机影响。
+- 横幅关闭状态仅缓存在当前浏览器，并且以文案文本作为签名；若后台重新发布完全相同的文案，已关闭的浏览器仍会继续隐藏。
+
+## Next Steps
+- 无。
+
+## Goal
+- 为管理员提供安全的“按邮箱重置用户密码”方案：复用现有 Admin API，不查询数据库明文密码；同时修复管理员改密后旧会话未失效的问题。
+
+## Todo
+- 无。
+
+## Doing
+- 无。
+
+## Done
+- 已确认用户密码存储在 `users.password_hash`，仓库不存在可读取明文密码的实现。
+- 已确认现有后台支持 `PUT /api/v1/admin/users/:id` 携带 `password` 修改用户密码。
+- 已确认当前实现存在安全缺口：管理员改密时不会递增 `token_version`，旧 JWT / Refresh Token 不会立即失效。
+- 已在 `backend/internal/service/admin_service.go` 中让管理员改密同步递增 `token_version`。
+- 已新增 `backend/internal/service/admin_service_update_user_test.go`，覆盖管理员改密会使 `token_version` 递增，以及非改密更新不会误伤会话版本。
+- 已新增 `tools/reset_user_password.sh`，支持用管理员 JWT 或 Admin API Key 按邮箱查找用户并重置密码。
+
+## Validation
+- `git diff --check -- backend/internal/service/admin_service.go backend/internal/service/admin_service_update_user_test.go tools/reset_user_password.sh TODO.md`
+- `cd backend && go test -tags unit ./internal/service -run 'TestAdminService_UpdateUser_(WithPasswordIncrementsTokenVersion|WithoutPasswordKeepsTokenVersion)'`
+- `bash -n tools/reset_user_password.sh`
+- `tools/reset_user_password.sh --help`
+
+## Risks
+- 新脚本依赖 `curl` 和 `python3`，未额外兼容极简运行环境。
+- 脚本通过 `search` 拉取用户列表后做邮箱精确匹配；如果后台检索策略未来变化，脚本需要同步调整。
+
+## Next Steps
+- 在管理机或本地终端用管理员 JWT / Admin API Key 执行 `tools/reset_user_password.sh`，不要再直接查数据库。
+
+## Goal
 - 提交 `UseKeyModal.vue` 的本地改动，忽略 `.playwright-mcp/` 调试产物，发布正式版 `v0.1.114`，并推送 `chengpengxiong/sub2api:0.1.114` 与 `latest` 镜像。
 
 ## Todo

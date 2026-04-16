@@ -380,6 +380,8 @@ func (s *SettingService) loadPublicSettingsFromRepo(ctx context.Context) (*Publi
 		SettingKeySiteSubtitle,
 		SettingKeyAPIBaseURL,
 		SettingKeyContactInfo,
+		SettingKeyTopBannerEnabled,
+		SettingKeyTopBannerText,
 		SettingKeyDocURL,
 		SettingKeyHomeContent,
 		SettingKeyCustomCSS,
@@ -460,6 +462,8 @@ func (s *SettingService) loadPublicSettingsFromRepo(ctx context.Context) (*Publi
 		SiteSubtitle:                     s.getStringOrDefault(settings, SettingKeySiteSubtitle, "Subscription to API Conversion Platform"),
 		APIBaseURL:                       settings[SettingKeyAPIBaseURL],
 		ContactInfo:                      settings[SettingKeyContactInfo],
+		TopBannerEnabled:                 settings[SettingKeyTopBannerEnabled] == "true",
+		TopBannerText:                    settings[SettingKeyTopBannerText],
 		DocURL:                           settings[SettingKeyDocURL],
 		HomeContent:                      settings[SettingKeyHomeContent],
 		CustomCSS:                        settings[SettingKeyCustomCSS],
@@ -617,6 +621,8 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		SiteSubtitle                     string          `json:"site_subtitle,omitempty"`
 		APIBaseURL                       string          `json:"api_base_url,omitempty"`
 		ContactInfo                      string          `json:"contact_info,omitempty"`
+		TopBannerEnabled                 bool            `json:"top_banner_enabled"`
+		TopBannerText                    string          `json:"top_banner_text,omitempty"`
 		DocURL                           string          `json:"doc_url,omitempty"`
 		HomeContent                      string          `json:"home_content,omitempty"`
 		CustomCSS                        string          `json:"custom_css,omitempty"`
@@ -656,6 +662,8 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		SiteSubtitle:                     settings.SiteSubtitle,
 		APIBaseURL:                       settings.APIBaseURL,
 		ContactInfo:                      settings.ContactInfo,
+		TopBannerEnabled:                 settings.TopBannerEnabled,
+		TopBannerText:                    settings.TopBannerText,
 		DocURL:                           settings.DocURL,
 		HomeContent:                      settings.HomeContent,
 		CustomCSS:                        settings.CustomCSS,
@@ -897,6 +905,8 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	updates[SettingKeySiteSubtitle] = settings.SiteSubtitle
 	updates[SettingKeyAPIBaseURL] = settings.APIBaseURL
 	updates[SettingKeyContactInfo] = settings.ContactInfo
+	updates[SettingKeyTopBannerEnabled] = strconv.FormatBool(settings.TopBannerEnabled)
+	updates[SettingKeyTopBannerText] = settings.TopBannerText
 	updates[SettingKeyDocURL] = settings.DocURL
 	updates[SettingKeyHomeContent] = settings.HomeContent
 	updates[SettingKeyCustomCSS] = settings.CustomCSS
@@ -1278,6 +1288,8 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyPromoCodeEnabled:                 "true", // 默认启用优惠码功能
 		SettingKeySiteName:                         "Sub2API",
 		SettingKeySiteLogo:                         "",
+		SettingKeyTopBannerEnabled:                 "false",
+		SettingKeyTopBannerText:                    "",
 		SettingKeyPurchaseSubscriptionEnabled:      "false",
 		SettingKeyPurchaseSubscriptionURL:          "",
 		SettingKeyTableDefaultPageSize:             "20",
@@ -1364,6 +1376,8 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		SiteSubtitle:                     s.getStringOrDefault(settings, SettingKeySiteSubtitle, "Subscription to API Conversion Platform"),
 		APIBaseURL:                       settings[SettingKeyAPIBaseURL],
 		ContactInfo:                      settings[SettingKeyContactInfo],
+		TopBannerEnabled:                 settings[SettingKeyTopBannerEnabled] == "true",
+		TopBannerText:                    settings[SettingKeyTopBannerText],
 		DocURL:                           settings[SettingKeyDocURL],
 		HomeContent:                      settings[SettingKeyHomeContent],
 		CustomCSS:                        settings[SettingKeyCustomCSS],

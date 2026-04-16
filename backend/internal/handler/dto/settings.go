@@ -82,6 +82,8 @@ type SystemSettings struct {
 	SiteSubtitle                string                          `json:"site_subtitle"`
 	APIBaseURL                  string                          `json:"api_base_url"`
 	ContactInfo                 string                          `json:"contact_info"`
+	TopBannerEnabled            bool                            `json:"top_banner_enabled"`
+	TopBannerText               string                          `json:"top_banner_text"`
 	DocURL                      string                          `json:"doc_url"`
 	HomeContent                 string                          `json:"home_content"`
 	CustomCSS                   string                          `json:"custom_css"`
@@ -188,6 +190,8 @@ type PublicSettings struct {
 	SiteSubtitle                     string           `json:"site_subtitle"`
 	APIBaseURL                       string           `json:"api_base_url"`
 	ContactInfo                      string           `json:"contact_info"`
+	TopBannerEnabled                 bool             `json:"top_banner_enabled"`
+	TopBannerText                    string           `json:"top_banner_text"`
 	DocURL                           string           `json:"doc_url"`
 	HomeContent                      string           `json:"home_content"`
 	CustomCSS                        string           `json:"custom_css"`

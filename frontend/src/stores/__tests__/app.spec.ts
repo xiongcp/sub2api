@@ -259,6 +259,8 @@ describe('useAppStore', () => {
         site_logo: '/logo.png',
         version: '1.0.0',
         contact_info: 'test@test.com',
+        top_banner_enabled: true,
+        top_banner_text: '充值联系 test',
         api_base_url: 'https://api.test.com',
         doc_url: 'https://docs.test.com',
       }
@@ -310,18 +312,31 @@ describe('useAppStore', () => {
         site_subtitle: '',
         api_base_url: '',
         contact_info: '',
+        top_banner_enabled: true,
+        top_banner_text: '充值联系 test',
         doc_url: '',
         home_content: '',
+        custom_css: '',
+        login_extra_html: '',
+        register_extra_html: '',
+        payment_footer_html: '',
+        global_footer_html: '',
         hide_ccs_import_button: false,
         purchase_subscription_enabled: false,
         purchase_subscription_url: '',
+        payment_enabled: false,
         table_default_page_size: 1000,
         table_page_size_options: [20, 100, 1000],
         custom_menu_items: [],
         custom_endpoints: [],
         linuxdo_oauth_enabled: false,
+        oidc_oauth_enabled: false,
+        oidc_oauth_provider_name: 'OIDC',
         backend_mode_enabled: false,
-        version: '1.0.0'
+        version: '1.0.0',
+        balance_low_notify_enabled: false,
+        account_quota_notify_enabled: false,
+        balance_low_notify_threshold: 0,
       })
 
       const store = useAppStore()
@@ -329,6 +344,8 @@ describe('useAppStore', () => {
 
       expect((window as any).__APP_CONFIG__.table_default_page_size).toBe(1000)
       expect((window as any).__APP_CONFIG__.table_page_size_options).toEqual([20, 100, 1000])
+      expect(store.cachedPublicSettings?.top_banner_enabled).toBe(true)
+      expect(store.cachedPublicSettings?.top_banner_text).toBe('充值联系 test')
       expect(localStorage.getItem('table-page-size')).toBeNull()
       expect(localStorage.getItem('table-page-size-source')).toBeNull()
     })

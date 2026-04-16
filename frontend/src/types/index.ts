@@ -144,6 +144,8 @@ export interface PublicSettings {
   site_subtitle: string
   api_base_url: string
   contact_info: string
+  top_banner_enabled: boolean
+  top_banner_text: string
   doc_url: string
   home_content: string
   custom_css: string

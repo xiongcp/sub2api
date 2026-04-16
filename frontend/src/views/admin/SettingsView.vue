@@ -2146,6 +2146,35 @@
               </p>
             </div>
 
+            <!-- Top Banner -->
+            <div class="rounded-xl border border-amber-200/80 bg-amber-50/60 p-4 dark:border-amber-500/20 dark:bg-amber-500/5">
+              <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('admin.settings.site.topBannerEnabled') }}
+                  </label>
+                  <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('admin.settings.site.topBannerHint') }}
+                  </p>
+                </div>
+                <Toggle v-model="form.top_banner_enabled" />
+              </div>
+              <div class="mt-4">
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.site.topBannerText') }}
+                </label>
+                <textarea
+                  v-model="form.top_banner_text"
+                  rows="3"
+                  class="input"
+                  :placeholder="t('admin.settings.site.topBannerTextPlaceholder')"
+                ></textarea>
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.site.topBannerTextHint') }}
+                </p>
+              </div>
+            </div>
+
             <!-- Doc URL -->
             <div>
               <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -3306,6 +3335,8 @@ const form = reactive<SettingsForm>({
   site_subtitle: 'Subscription to API Conversion Platform',
   api_base_url: '',
   contact_info: '',
+  top_banner_enabled: false,
+  top_banner_text: '',
   doc_url: '',
   home_content: '',
   custom_css: '',
@@ -3924,6 +3955,8 @@ async function saveSettings() {
       site_subtitle: form.site_subtitle,
       api_base_url: form.api_base_url,
       contact_info: form.contact_info,
+      top_banner_enabled: form.top_banner_enabled,
+      top_banner_text: form.top_banner_text,
       doc_url: form.doc_url,
       home_content: form.home_content,
       custom_css: form.custom_css,

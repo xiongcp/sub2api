@@ -98,3 +98,18 @@ func TestSettingService_GetPublicSettings_ExposesCustomBrandingSlots(t *testing.
 	require.Equal(t, "<div>payment</div>", settings.PaymentFooterHTML)
 	require.Equal(t, "<div>footer</div>", settings.GlobalFooterHTML)
 }
+
+func TestSettingService_GetPublicSettings_ExposesTopBannerFields(t *testing.T) {
+	repo := &settingPublicRepoStub{
+		values: map[string]string{
+			SettingKeyTopBannerEnabled: "true",
+			SettingKeyTopBannerText:    "充值联系 support@example.com",
+		},
+	}
+	svc := NewSettingService(repo, &config.Config{})
+
+	settings, err := svc.GetPublicSettings(context.Background())
+	require.NoError(t, err)
+	require.True(t, settings.TopBannerEnabled)
+	require.Equal(t, "充值联系 support@example.com", settings.TopBannerText)
+}

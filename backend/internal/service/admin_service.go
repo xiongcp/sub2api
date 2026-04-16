@@ -607,6 +607,8 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		if err := user.SetPassword(input.Password); err != nil {
 			return nil, err
 		}
+		// 管理员重置密码后也必须让旧 JWT / Refresh Token 失效。
+		user.TokenVersion++
 	}
 
 	if input.Username != nil {
