@@ -2,27 +2,37 @@
 - 提交当前工作区内已完成的密码重置与顶部横幅改动，推送 `main`，发布正式版 `v0.1.115`，并推送 `chengpengxiong/sub2api:0.1.115` 与 `chengpengxiong/sub2api:latest` 镜像。
 
 ## Todo
-- 升级版本号到 `0.1.115` 并整理本轮发布说明。
-- 执行本轮涉及改动的目标测试和脚本校验。
-- 提交代码、推送分支与 git tag `v0.1.115`。
-- 构建并推送 Docker 镜像标签 `0.1.115` 和 `latest`。
+- 无。
 
 ## Doing
-- 正在进行发布前校验与版本同步。
+- 无。
 
 ## Done
 - 已确认当前 `main`/`origin/main`/`v0.1.114` 指向同一已发布提交，新的未提交改动需要以新版本发布，不能覆盖旧 tag 与旧镜像。
 - 已将 `backend/cmd/server/VERSION` 更新为 `0.1.115`。
+- 已完成目标测试与脚本校验，并通过 `git diff --check`。
+- 已创建发布提交 `8afbf362 feat: add top banner and password reset tooling` 并推送到 `origin/main`。
+- 已创建并推送 git tag `v0.1.115`。
+- 已构建并推送 `chengpengxiong/sub2api:0.1.115` 与 `chengpengxiong/sub2api:latest`，两者 digest 同为 `sha256:36084820fd5e7d37fb0488ec478370ed30aea6bff0bc4b95f7435ba51b58cf01`。
 
 ## Validation
-- 待补充。
+- `git diff --check`
+- `cd backend && go test -tags unit ./internal/service -run 'TestSettingService_(GetPublicSettings|UpdateSettings_)|TestAdminService_UpdateUser_(WithPasswordIncrementsTokenVersion|WithoutPasswordKeepsTokenVersion)'`
+- `cd backend && go test -tags unit ./internal/server -run 'TestAPIContracts'`
+- `cd frontend && pnpm test:run src/stores/__tests__/app.spec.ts src/components/layout/__tests__/AppHeader.spec.ts`
+- `bash -n tools/reset_user_password.sh`
+- `git push origin main`
+- `git push origin v0.1.115`
+- `docker build -t chengpengxiong/sub2api:0.1.115 -t chengpengxiong/sub2api:latest --build-arg VERSION=0.1.115 --build-arg COMMIT=8afbf362 --build-arg DATE=<UTC时间> --build-arg GOPROXY=https://goproxy.cn,direct --build-arg GOSUMDB=sum.golang.google.cn -f Dockerfile .`
+- `docker push chengpengxiong/sub2api:0.1.115`
+- `docker push chengpengxiong/sub2api:latest`
 
 ## Risks
 - 当前工作区包含两组功能改动：管理员重置密码会失效旧会话，以及登录后顶部横幅；本轮将作为一次合并发布提交。
 - 若直接沿用 `0.1.114` 发布，会造成版本号、git tag 和 Docker 镜像内容不一致；因此本轮统一提升到 `0.1.115`。
 
 ## Next Steps
-- 完成测试、提交、推送和镜像发布后回填本节状态。
+- 无。
 
 ## Goal
 - 为登录后页面增加可配置的顶部通知横幅，用于展示“充值联系 xxx”等固定运营消息；消息读取继续复用公开设置缓存，避免额外查询压力。
