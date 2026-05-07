@@ -18,15 +18,13 @@ import (
 
 // APIKeyHandler handles API key-related requests
 type APIKeyHandler struct {
-	apiKeyService  *service.APIKeyService
-	settingService *service.SettingService
+	apiKeyService *service.APIKeyService
 }
 
 // NewAPIKeyHandler creates a new APIKeyHandler
-func NewAPIKeyHandler(apiKeyService *service.APIKeyService, settingService *service.SettingService) *APIKeyHandler {
+func NewAPIKeyHandler(apiKeyService *service.APIKeyService) *APIKeyHandler {
 	return &APIKeyHandler{
-		apiKeyService:  apiKeyService,
-		settingService: settingService,
+		apiKeyService: apiKeyService,
 	}
 }
 
@@ -290,40 +288,6 @@ func (h *APIKeyHandler) GetAvailableGroups(c *gin.Context) {
 	out := make([]dto.Group, 0, len(groups))
 	for i := range groups {
 		out = append(out, *dto.GroupFromService(&groups[i]))
-	}
-	response.Success(c, out)
-}
-
-// GetUsageGuide 获取最新的 API Key 使用说明配置
-// GET /api/v1/keys/usage-guide
-func (h *APIKeyHandler) GetUsageGuide(c *gin.Context) {
-	guide, err := h.settingService.GetAPIKeyUsageGuide(c.Request.Context())
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	response.Success(c, guide)
-}
-
-// GetAvailableGroupSummaries 获取用户可见的分组摘要列表
-// GET /api/v1/groups/available/summary
-func (h *APIKeyHandler) GetAvailableGroupSummaries(c *gin.Context) {
-	subject, ok := middleware2.GetAuthSubjectFromContext(c)
-	if !ok {
-		response.Unauthorized(c, "User not authenticated")
-		return
-	}
-
-	groups, err := h.apiKeyService.GetAvailableGroupSummaries(c.Request.Context(), subject.UserID)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	out := make([]dto.UserGroupSummary, 0, len(groups))
-	for i := range groups {
-		out = append(out, *dto.UserGroupSummaryFromService(&groups[i]))
 	}
 	response.Success(c, out)
 }

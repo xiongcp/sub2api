@@ -1304,6 +1304,16 @@ func (a *Account) IsOpenAIWSAllowStoreRecoveryEnabled() bool {
 	return ok && enabled
 }
 
+// IsOpenAIStoreEnabled 返回账号是否启用 OpenAI store（服务端历史）。
+// 字段：accounts.extra.openai_store_enabled。
+func (a *Account) IsOpenAIStoreEnabled() bool {
+	if a == nil || !a.IsOpenAI() || a.Extra == nil {
+		return false
+	}
+	enabled, ok := a.Extra["openai_store_enabled"].(bool)
+	return ok && enabled
+}
+
 // IsOpenAIOAuthPassthroughEnabled 兼容旧接口，等价于 OAuth 账号的 IsOpenAIPassthroughEnabled。
 func (a *Account) IsOpenAIOAuthPassthroughEnabled() bool {
 	return a != nil && a.IsOpenAIOAuth() && a.IsOpenAIPassthroughEnabled()
@@ -1550,6 +1560,62 @@ func (a *Account) GetQuotaWeeklyLimit() float64 {
 // GetQuotaWeeklyUsed 获取本周已用额度（美元）
 func (a *Account) GetQuotaWeeklyUsed() float64 {
 	return a.getExtraFloat64("quota_weekly_used")
+}
+
+// GetQuotaRemaining 获取总额度剩余值；未配置总额度时返回 0。
+func (a *Account) GetQuotaRemaining() float64 {
+	limit := a.GetQuotaLimit()
+	if limit <= 0 {
+		return 0
+	}
+	return limit - a.GetQuotaUsed()
+}
+
+// GetQuotaMinRemaining 获取停止调度的最小剩余额度阈值（美元）。
+// 返回 0 表示未启用。
+func (a *Account) GetQuotaMinRemaining() float64 {
+	val := a.getExtraFloat64("quota_min_remaining")
+	if val <= 0 {
+		return 0
+	}
+	return val
+}
+
+// GetQuotaMinRemainingRatio 获取停止调度的最小剩余额度比例阈值（0-1）。
+// 返回 0 表示未启用。
+func (a *Account) GetQuotaMinRemainingRatio() float64 {
+	val := a.getExtraFloat64("quota_min_remaining_ratio")
+	if val <= 0 || val >= 1 {
+		return 0
+	}
+	return val
+}
+
+// IsBelowQuotaSchedulingThreshold 检查总额度是否低于"停止调度"阈值。
+// 仅在配置了 quota_limit 且显式设置阈值时生效。
+func (a *Account) IsBelowQuotaSchedulingThreshold() bool {
+	limit := a.GetQuotaLimit()
+	if limit <= 0 {
+		return false
+	}
+
+	remaining := a.GetQuotaRemaining()
+	if remaining <= 0 {
+		return true
+	}
+
+	if minRemaining := a.GetQuotaMinRemaining(); minRemaining > 0 && remaining <= minRemaining {
+		return true
+	}
+
+	if minRatio := a.GetQuotaMinRemainingRatio(); minRatio > 0 {
+		remainingRatio := remaining / limit
+		if remainingRatio <= minRatio {
+			return true
+		}
+	}
+
+	return false
 }
 
 // getExtraFloat64 从 Extra 中读取指定 key 的 float64 值

@@ -45,6 +45,15 @@ type SettingRepository interface {
 	Delete(ctx context.Context, key string) error
 }
 
+// SettingReadCache defines the Redis-backed L2 cache used by setting reads.
+type SettingReadCache interface {
+	Get(ctx context.Context, key string, dest any) (bool, error)
+	Set(ctx context.Context, key string, value any, ttl time.Duration) error
+	Delete(ctx context.Context, key string) error
+	PublishInvalidation(ctx context.Context, key string) error
+	SubscribeInvalidation(ctx context.Context, handler func(key string)) error
+}
+
 // cachedVersionBounds 缓存 Claude Code 版本号上下限（进程内缓存，60s TTL）
 type cachedVersionBounds struct {
 	min       string // 空字符串 = 不检查
