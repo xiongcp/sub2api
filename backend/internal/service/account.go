@@ -121,7 +121,7 @@ func (a *Account) IsSchedulable() bool {
 	if a.TempUnschedulableUntil != nil && now.Before(*a.TempUnschedulableUntil) {
 		return false
 	}
-	if a.IsBelowQuotaSchedulingThreshold() {
+	if a.IsAPIKeyOrBedrock() && a.IsQuotaExceeded() {
 		return false
 	}
 	return true
@@ -393,6 +393,56 @@ func parseTempUnschedInt(value any) int {
 	return 0
 }
 
+const (
+	// OpenAICompactModeAuto follows compact-probe results when deciding compact eligibility.
+	OpenAICompactModeAuto = "auto"
+	// OpenAICompactModeForceOn always treats the account as compact-supported.
+	OpenAICompactModeForceOn = "force_on"
+	// OpenAICompactModeForceOff always treats the account as compact-unsupported.
+	OpenAICompactModeForceOff = "force_off"
+)
+
+func normalizeOpenAICompactMode(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case OpenAICompactModeForceOn:
+		return OpenAICompactModeForceOn
+	case OpenAICompactModeForceOff:
+		return OpenAICompactModeForceOff
+	default:
+		return OpenAICompactModeAuto
+	}
+}
+
+func stringMappingFromRaw(raw any) map[string]string {
+	switch mapping := raw.(type) {
+	case map[string]any:
+		if len(mapping) == 0 {
+			return nil
+		}
+		result := make(map[string]string, len(mapping))
+		for key, value := range mapping {
+			if str, ok := value.(string); ok {
+				result[key] = str
+			}
+		}
+		if len(result) == 0 {
+			return nil
+		}
+		return result
+	case map[string]string:
+		if len(mapping) == 0 {
+			return nil
+		}
+		result := make(map[string]string, len(mapping))
+		for key, value := range mapping {
+			result[key] = value
+		}
+		return result
+	default:
+		return nil
+	}
+}
+
 func (a *Account) GetModelMapping() map[string]string {
 	credentialsPtr := mapPtr(a.Credentials)
 	rawMapping, _ := a.Credentials["model_mapping"].(map[string]any)
@@ -594,6 +644,77 @@ func (a *Account) ResolveMappedModel(requestedModel string) (mappedModel string,
 		if mappedModel, matched := resolveRequestedModelInMapping(mapping, normalized); matched {
 			return mappedModel, true
 		}
+	}
+	return requestedModel, false
+}
+
+// GetOpenAICompactMode returns the compact routing mode for an OpenAI account.
+// Missing or invalid values fall back to "auto".
+func (a *Account) GetOpenAICompactMode() string {
+	if a == nil || !a.IsOpenAI() || a.Extra == nil {
+		return OpenAICompactModeAuto
+	}
+	mode, _ := a.Extra["openai_compact_mode"].(string)
+	return normalizeOpenAICompactMode(mode)
+}
+
+// OpenAICompactSupportKnown reports whether compact capability is known for this
+// account and, when known, whether it is supported.
+func (a *Account) OpenAICompactSupportKnown() (supported bool, known bool) {
+	if a == nil || !a.IsOpenAI() {
+		return false, false
+	}
+
+	switch a.GetOpenAICompactMode() {
+	case OpenAICompactModeForceOn:
+		return true, true
+	case OpenAICompactModeForceOff:
+		return false, true
+	}
+
+	if a.Extra == nil {
+		return false, false
+	}
+	supported, ok := a.Extra["openai_compact_supported"].(bool)
+	if !ok {
+		return false, false
+	}
+	return supported, true
+}
+
+// AllowsOpenAICompact reports whether the account may be considered for compact
+// requests. Unknown capability remains allowed to avoid breaking older accounts
+// before an explicit probe has been run.
+func (a *Account) AllowsOpenAICompact() bool {
+	if a == nil || !a.IsOpenAI() {
+		return false
+	}
+	supported, known := a.OpenAICompactSupportKnown()
+	if !known {
+		return true
+	}
+	return supported
+}
+
+// GetCompactModelMapping returns compact-only model remapping configuration.
+// This mapping is intended for /responses/compact only and does not affect
+// normal /responses traffic.
+func (a *Account) GetCompactModelMapping() map[string]string {
+	if a == nil || a.Credentials == nil {
+		return nil
+	}
+	return stringMappingFromRaw(a.Credentials["compact_model_mapping"])
+}
+
+// ResolveCompactMappedModel resolves compact-only model remapping and reports
+// whether a compact-specific mapping rule matched.
+func (a *Account) ResolveCompactMappedModel(requestedModel string) (mappedModel string, matched bool) {
+	mapping := a.GetCompactModelMapping()
+	if len(mapping) == 0 {
+		return requestedModel, false
+	}
+	if mappedModel, matched := resolveRequestedModelInMapping(mapping, requestedModel); matched {
+		return mappedModel, true
 	}
 	return requestedModel, false
 }
@@ -911,6 +1032,32 @@ func (a *Account) GetChatGPTAccountID() string {
 	return a.GetCredential("chatgpt_account_id")
 }
 
+func (a *Account) GetOpenAIDeviceID() string {
+	if !a.IsOpenAIOAuth() {
+		return ""
+	}
+	return strings.TrimSpace(a.GetExtraString("openai_device_id"))
+}
+
+func (a *Account) GetOpenAISessionID() string {
+	if !a.IsOpenAIOAuth() {
+		return ""
+	}
+	return strings.TrimSpace(a.GetExtraString("openai_session_id"))
+}
+
+func (a *Account) SupportsOpenAIImageCapability(capability OpenAIImagesCapability) bool {
+	if !a.IsOpenAI() {
+		return false
+	}
+	switch capability {
+	case OpenAIImagesCapabilityBasic, OpenAIImagesCapabilityNative:
+		return a.Type == AccountTypeOAuth || a.Type == AccountTypeAPIKey
+	default:
+		return true
+	}
+}
+
 func (a *Account) GetChatGPTUserID() string {
 	if !a.IsOpenAIOAuth() {
 		return ""
@@ -986,23 +1133,6 @@ func (a *Account) IsOpenAIPassthroughEnabled() bool {
 		return enabled
 	}
 	if enabled, ok := a.Extra["openai_oauth_passthrough"].(bool); ok {
-		return enabled
-	}
-	return false
-}
-
-// IsOpenAIStoreEnabled 返回 OpenAI OAuth 账号是否允许上游存储响应（store=true）。
-//
-// 启用后，上游将存储每轮响应，客户端可通过 previous_response_id 在下一轮续链，
-// 避免每轮全量重发历史，大幅降低长会话 token 用量。
-//
-// 字段：accounts.extra.openai_store_enabled（bool）。
-// 默认 false 保持向后兼容（防止上游拒绝 store=true 时请求失败）。
-func (a *Account) IsOpenAIStoreEnabled() bool {
-	if a == nil || !a.IsOpenAI() || a.Extra == nil {
-		return false
-	}
-	if enabled, ok := a.Extra["openai_store_enabled"].(bool); ok {
 		return enabled
 	}
 	return false
@@ -1400,62 +1530,6 @@ func (a *Account) GetQuotaLimit() float64 {
 // GetQuotaUsed 获取 API Key 账号的已用配额（美元）
 func (a *Account) GetQuotaUsed() float64 {
 	return a.getExtraFloat64("quota_used")
-}
-
-// GetQuotaRemaining 获取总额度剩余值；未配置总额度时返回 0。
-func (a *Account) GetQuotaRemaining() float64 {
-	limit := a.GetQuotaLimit()
-	if limit <= 0 {
-		return 0
-	}
-	return limit - a.GetQuotaUsed()
-}
-
-// GetQuotaMinRemaining 获取停止调度的最小剩余额度阈值（美元）。
-// 返回 0 表示未启用。
-func (a *Account) GetQuotaMinRemaining() float64 {
-	val := a.getExtraFloat64("quota_min_remaining")
-	if val <= 0 {
-		return 0
-	}
-	return val
-}
-
-// GetQuotaMinRemainingRatio 获取停止调度的最小剩余额度比例阈值（0-1）。
-// 返回 0 表示未启用。
-func (a *Account) GetQuotaMinRemainingRatio() float64 {
-	val := a.getExtraFloat64("quota_min_remaining_ratio")
-	if val <= 0 || val >= 1 {
-		return 0
-	}
-	return val
-}
-
-// IsBelowQuotaSchedulingThreshold 检查总额度是否低于“停止调度”阈值。
-// 仅在配置了 quota_limit 且显式设置阈值时生效。
-func (a *Account) IsBelowQuotaSchedulingThreshold() bool {
-	limit := a.GetQuotaLimit()
-	if limit <= 0 {
-		return false
-	}
-
-	remaining := a.GetQuotaRemaining()
-	if remaining <= 0 {
-		return true
-	}
-
-	if minRemaining := a.GetQuotaMinRemaining(); minRemaining > 0 && remaining <= minRemaining {
-		return true
-	}
-
-	if minRatio := a.GetQuotaMinRemainingRatio(); minRatio > 0 {
-		remainingRatio := remaining / limit
-		if remainingRatio <= minRatio {
-			return true
-		}
-	}
-
-	return false
 }
 
 // GetQuotaDailyLimit 获取日额度限制（美元），0 表示未启用

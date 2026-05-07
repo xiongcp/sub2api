@@ -224,44 +224,33 @@ func TestSettingService_UpdateSettings_TablePreferences(t *testing.T) {
 	require.Equal(t, "[20,100]", repo.updates[SettingKeyTablePageSizeOptions])
 }
 
-func TestSettingService_UpdateSettings_SMTPPersistsSecurityModeAndLegacyFlag(t *testing.T) {
+func TestSettingService_UpdateSettings_PaymentVisibleMethodsAndAdvancedScheduler(t *testing.T) {
 	repo := &settingUpdateRepoStub{}
 	svc := NewSettingService(repo, &config.Config{})
 
 	err := svc.UpdateSettings(context.Background(), &SystemSettings{
-		SMTPHost:         "smtp.example.com",
-		SMTPPort:         587,
-		SMTPSecurityMode: string(SMTPSecurityModeStartTLS),
+		PaymentVisibleMethodAlipaySource:  "alipay",
+		PaymentVisibleMethodWxpaySource:   "easypay",
+		PaymentVisibleMethodAlipayEnabled: true,
+		PaymentVisibleMethodWxpayEnabled:  false,
+		OpenAIAdvancedSchedulerEnabled:    true,
 	})
 	require.NoError(t, err)
-	require.Equal(t, string(SMTPSecurityModeStartTLS), repo.updates[SettingKeySMTPSecurityMode])
-	require.Equal(t, "false", repo.updates[SettingKeySMTPUseTLS])
-
-	err = svc.UpdateSettings(context.Background(), &SystemSettings{
-		SMTPHost:   "smtp.example.com",
-		SMTPPort:   465,
-		SMTPUseTLS: true,
-	})
-	require.NoError(t, err)
-	require.Equal(t, string(SMTPSecurityModeImplicitTLS), repo.updates[SettingKeySMTPSecurityMode])
-	require.Equal(t, "true", repo.updates[SettingKeySMTPUseTLS])
+	require.Equal(t, VisibleMethodSourceOfficialAlipay, repo.updates[SettingPaymentVisibleMethodAlipaySource])
+	require.Equal(t, VisibleMethodSourceEasyPayWechat, repo.updates[SettingPaymentVisibleMethodWxpaySource])
+	require.Equal(t, "true", repo.updates[SettingPaymentVisibleMethodAlipayEnabled])
+	require.Equal(t, "false", repo.updates[SettingPaymentVisibleMethodWxpayEnabled])
+	require.Equal(t, "true", repo.updates[openAIAdvancedSchedulerSettingKey])
 }
 
-func TestSettingService_UpdateSettings_CustomBrandingSlots(t *testing.T) {
+func TestSettingService_UpdateSettings_RejectsInvalidPaymentVisibleMethodSource(t *testing.T) {
 	repo := &settingUpdateRepoStub{}
 	svc := NewSettingService(repo, &config.Config{})
 
 	err := svc.UpdateSettings(context.Background(), &SystemSettings{
-		CustomCSS:         "body { color: red; }",
-		LoginExtraHTML:    "<p>login</p>",
-		RegisterExtraHTML: "<p>register</p>",
-		PaymentFooterHTML: "<p>payment</p>",
-		GlobalFooterHTML:  "<p>footer</p>",
+		PaymentVisibleMethodAlipaySource: "not-a-provider",
 	})
-	require.NoError(t, err)
-	require.Equal(t, "body { color: red; }", repo.updates[SettingKeyCustomCSS])
-	require.Equal(t, "<p>login</p>", repo.updates[SettingKeyLoginExtraHTML])
-	require.Equal(t, "<p>register</p>", repo.updates[SettingKeyRegisterExtraHTML])
-	require.Equal(t, "<p>payment</p>", repo.updates[SettingKeyPaymentFooterHTML])
-	require.Equal(t, "<p>footer</p>", repo.updates[SettingKeyGlobalFooterHTML])
+	require.Error(t, err)
+	require.Equal(t, "INVALID_PAYMENT_VISIBLE_METHOD_SOURCE", infraerrors.Reason(err))
+	require.Nil(t, repo.updates)
 }

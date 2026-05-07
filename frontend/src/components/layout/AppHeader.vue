@@ -1,38 +1,5 @@
 <template>
   <header class="glass sticky top-0 z-30 border-b border-gray-200/50 dark:border-dark-700/50">
-    <div
-      v-if="shouldShowTopBanner"
-      class="flex items-start justify-between gap-3 border-b border-amber-200/70 bg-gradient-to-r from-amber-50/95 via-orange-50/85 to-amber-50/95 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/20 dark:from-amber-500/10 dark:via-orange-500/5 dark:to-amber-500/10 dark:text-amber-100 md:px-6"
-    >
-      <div class="flex min-w-0 items-start gap-2.5">
-        <svg
-          class="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-300"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          stroke-width="1.8"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M10.34 3.94c.57-.99 1.99-.99 2.56 0l7.02 12.16c.57.99-.14 2.23-1.28 2.23H4.6c-1.14 0-1.85-1.24-1.28-2.23L10.34 3.94zM12 9v3.75m0 3h.008v.008H12v-.008z"
-          />
-        </svg>
-        <p class="min-w-0 whitespace-pre-line break-words font-medium leading-6">
-          {{ topBannerText }}
-        </p>
-      </div>
-      <button
-        type="button"
-        data-testid="top-banner-close"
-        class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-amber-700 transition-colors hover:bg-amber-100/80 hover:text-amber-900 dark:text-amber-200 dark:hover:bg-amber-500/10 dark:hover:text-white"
-        :aria-label="t('common.close')"
-        @click="dismissTopBanner"
-      >
-        <Icon name="x" size="sm" />
-      </button>
-    </div>
-
     <div class="flex h-16 items-center justify-between px-4 md:px-6">
       <!-- Left: Mobile Menu Toggle + Page Title -->
       <div class="flex items-center gap-4">
@@ -107,10 +74,14 @@
             class="flex items-center gap-2 rounded-xl p-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-dark-800"
             aria-label="User Menu"
           >
-            <div
-              class="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 text-sm font-medium text-white shadow-sm"
-            >
-              {{ userInitials }}
+            <div class="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 text-sm font-medium text-white shadow-sm">
+              <img
+                v-if="avatarUrl"
+                :src="avatarUrl"
+                :alt="displayName"
+                class="h-full w-full object-cover"
+              >
+              <span v-else>{{ userInitials }}</span>
             </div>
             <div class="hidden text-left md:block">
               <div class="text-sm font-medium text-gray-900 dark:text-white">
@@ -259,24 +230,13 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const adminSettingsStore = useAdminSettingsStore()
 const onboardingStore = useOnboardingStore()
-const TOP_BANNER_DISMISSED_SIGNATURE_KEY = 'sub2api.top_banner_dismissed_signature'
 
 const user = computed(() => authStore.user)
 const dropdownOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
-const dismissedTopBannerSignature = ref('')
 const contactInfo = computed(() => appStore.contactInfo)
 const docUrl = computed(() => appStore.docUrl)
-const topBannerText = computed(() => (appStore.cachedPublicSettings?.top_banner_text || '').trim())
-const shouldShowTopBanner = computed(() => {
-  if (!authStore.isAuthenticated || !user.value) {
-    return false
-  }
-  if (!appStore.cachedPublicSettings?.top_banner_enabled || topBannerText.value.length === 0) {
-    return false
-  }
-  return dismissedTopBannerSignature.value !== topBannerText.value
-})
+const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')
 
 // 只在标准模式的管理员下显示新手引导按钮
 const showOnboardingButton = computed(() => {
@@ -338,12 +298,6 @@ function closeDropdown() {
   dropdownOpen.value = false
 }
 
-function dismissTopBanner() {
-  if (!topBannerText.value) return
-  dismissedTopBannerSignature.value = topBannerText.value
-  localStorage.setItem(TOP_BANNER_DISMISSED_SIGNATURE_KEY, topBannerText.value)
-}
-
 async function handleLogout() {
   closeDropdown()
   try {
@@ -367,7 +321,6 @@ function handleClickOutside(event: MouseEvent) {
 }
 
 onMounted(() => {
-  dismissedTopBannerSignature.value = localStorage.getItem(TOP_BANNER_DISMISSED_SIGNATURE_KEY) || ''
   document.addEventListener('click', handleClickOutside)
 })
 

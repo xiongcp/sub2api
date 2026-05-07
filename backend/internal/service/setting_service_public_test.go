@@ -78,38 +78,76 @@ func TestSettingService_GetPublicSettings_ExposesTablePreferences(t *testing.T) 
 	require.Equal(t, []int{20, 50, 100}, settings.TablePageSizeOptions)
 }
 
-func TestSettingService_GetPublicSettings_ExposesCustomBrandingSlots(t *testing.T) {
+func TestSettingService_GetPublicSettings_ExposesForceEmailOnThirdPartySignup(t *testing.T) {
 	repo := &settingPublicRepoStub{
 		values: map[string]string{
-			SettingKeyCustomCSS:         "body { color: red; }",
-			SettingKeyLoginExtraHTML:    "<div>login</div>",
-			SettingKeyRegisterExtraHTML: "<div>register</div>",
-			SettingKeyPaymentFooterHTML: "<div>payment</div>",
-			SettingKeyGlobalFooterHTML:  "<div>footer</div>",
+			SettingKeyForceEmailOnThirdPartySignup: "true",
 		},
 	}
 	svc := NewSettingService(repo, &config.Config{})
 
 	settings, err := svc.GetPublicSettings(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, "body { color: red; }", settings.CustomCSS)
-	require.Equal(t, "<div>login</div>", settings.LoginExtraHTML)
-	require.Equal(t, "<div>register</div>", settings.RegisterExtraHTML)
-	require.Equal(t, "<div>payment</div>", settings.PaymentFooterHTML)
-	require.Equal(t, "<div>footer</div>", settings.GlobalFooterHTML)
+	require.True(t, settings.ForceEmailOnThirdPartySignup)
 }
 
-func TestSettingService_GetPublicSettings_ExposesTopBannerFields(t *testing.T) {
-	repo := &settingPublicRepoStub{
+func TestSettingService_GetPublicSettings_ExposesWeChatOAuthModeCapabilities(t *testing.T) {
+	svc := NewSettingService(&settingPublicRepoStub{
 		values: map[string]string{
-			SettingKeyTopBannerEnabled: "true",
-			SettingKeyTopBannerText:    "充值联系 support@example.com",
+			SettingKeyWeChatConnectEnabled:             "true",
+			SettingKeyWeChatConnectAppID:               "wx-mp-app",
+			SettingKeyWeChatConnectAppSecret:           "wx-mp-secret",
+			SettingKeyWeChatConnectMode:                "mp",
+			SettingKeyWeChatConnectScopes:              "snsapi_base",
+			SettingKeyWeChatConnectOpenEnabled:         "true",
+			SettingKeyWeChatConnectMPEnabled:           "true",
+			SettingKeyWeChatConnectRedirectURL:         "https://api.example.com/api/v1/auth/oauth/wechat/callback",
+			SettingKeyWeChatConnectFrontendRedirectURL: "/auth/wechat/callback",
 		},
-	}
-	svc := NewSettingService(repo, &config.Config{})
+	}, &config.Config{})
 
 	settings, err := svc.GetPublicSettings(context.Background())
 	require.NoError(t, err)
-	require.True(t, settings.TopBannerEnabled)
-	require.Equal(t, "充值联系 support@example.com", settings.TopBannerText)
+	require.True(t, settings.WeChatOAuthEnabled)
+	require.True(t, settings.WeChatOAuthOpenEnabled)
+	require.True(t, settings.WeChatOAuthMPEnabled)
+}
+
+func TestSettingService_GetPublicSettings_DoesNotExposeMobileOnlyWeChatAsWebOAuthAvailable(t *testing.T) {
+	svc := NewSettingService(&settingPublicRepoStub{
+		values: map[string]string{
+			SettingKeyWeChatConnectEnabled:             "true",
+			SettingKeyWeChatConnectMobileEnabled:       "true",
+			SettingKeyWeChatConnectMode:                "mobile",
+			SettingKeyWeChatConnectMobileAppID:         "wx-mobile-app",
+			SettingKeyWeChatConnectMobileAppSecret:     "wx-mobile-secret",
+			SettingKeyWeChatConnectFrontendRedirectURL: "/auth/wechat/callback",
+		},
+	}, &config.Config{})
+
+	settings, err := svc.GetPublicSettings(context.Background())
+	require.NoError(t, err)
+	require.False(t, settings.WeChatOAuthEnabled)
+	require.False(t, settings.WeChatOAuthOpenEnabled)
+	require.False(t, settings.WeChatOAuthMPEnabled)
+	require.True(t, settings.WeChatOAuthMobileEnabled)
+}
+
+func TestSettingService_GetPublicSettings_FallsBackToConfigForWeChatOAuthCapabilities(t *testing.T) {
+	svc := NewSettingService(&settingPublicRepoStub{values: map[string]string{}}, &config.Config{
+		WeChat: config.WeChatConnectConfig{
+			Enabled:             true,
+			OpenEnabled:         true,
+			OpenAppID:           "wx-open-config",
+			OpenAppSecret:       "wx-open-secret",
+			FrontendRedirectURL: "/auth/wechat/config-callback",
+		},
+	})
+
+	settings, err := svc.GetPublicSettings(context.Background())
+	require.NoError(t, err)
+	require.True(t, settings.WeChatOAuthEnabled)
+	require.True(t, settings.WeChatOAuthOpenEnabled)
+	require.False(t, settings.WeChatOAuthMPEnabled)
+	require.False(t, settings.WeChatOAuthMobileEnabled)
 }
