@@ -232,6 +232,7 @@ export interface PublicSettings {
   channel_monitor_default_interval_seconds: number
   available_channels_enabled: boolean
   affiliate_enabled: boolean
+  custom_css?: string
 }
 
 export interface AuthResponse {
@@ -883,6 +884,12 @@ export interface Account {
   current_window_cost?: number | null // 当前窗口费用
   active_sessions?: number | null // 当前活跃会话数
   current_rpm?: number | null // 当前分钟 RPM 计数
+
+  // 配额剩余与低配额阈值（本地扩展）
+  quota_remaining?: number | null
+  quota_min_remaining?: number | null
+  quota_min_remaining_ratio?: number | null
+  low_quota_threshold_triggered?: boolean | null
 }
 
 // Account Usage types
@@ -1815,6 +1822,49 @@ export interface UpdateScheduledTestPlanRequest {
   enabled?: boolean
   max_results?: number
   auto_recover?: boolean
+}
+
+// User group access scope (for non-admin group listing)
+export type UserGroupAccessScope = 'public' | 'subscription' | 'exclusive'
+
+// Lightweight group summary returned by /groups/available/summary
+export interface UserGroupSummary {
+  id: number
+  name: string
+  description: string | null
+  platform: GroupPlatform
+  rate_multiplier: number
+  subscription_type: SubscriptionType
+  access_scope: UserGroupAccessScope
+}
+
+// API key usage guide per-platform field structure
+export interface ApiKeyUsageGuidePlatformContent {
+  description: string
+  config_toml_hint: string
+  note: string
+  note_windows: string
+  model_comment: string
+  claude_note: string
+  gemini_note: string
+}
+
+// API key usage guide content returned by /keys/usage-guide
+export interface ApiKeyUsageGuideContent {
+  description: string
+  note: string
+  no_group_title: string
+  no_group_description: string
+  openai: ApiKeyUsageGuidePlatformContent
+  gemini: ApiKeyUsageGuidePlatformContent
+  antigravity: ApiKeyUsageGuidePlatformContent
+  opencode: { hint: string }
+}
+
+// Response wrapper for /keys/usage-guide
+export interface ApiKeyUsageGuideResponse {
+  content: ApiKeyUsageGuideContent
+  api_base_url?: string
 }
 
 // Payment types

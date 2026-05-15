@@ -50,14 +50,9 @@
       </div>
 
       <!-- Footer Links -->
-      <div class="auth-layout-footer mt-6 text-center text-sm">
+      <div class="mt-6 text-center text-sm">
         <slot name="footer" />
       </div>
-
-      <TrustedHtmlBlock
-        class="prose prose-sm mt-6 max-w-none text-center text-gray-500 dark:prose-invert dark:text-dark-400"
-        :content="globalFooterHtml"
-      />
 
       <!-- Copyright -->
       <div class="auth-layout-copyright mt-8 text-center text-xs text-gray-400 dark:text-dark-500">
@@ -70,7 +65,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useAppStore } from '@/stores'
-import TrustedHtmlBlock from '@/components/common/TrustedHtmlBlock.vue'
 import { sanitizeUrl } from '@/utils/url'
 
 const appStore = useAppStore()
@@ -78,7 +72,6 @@ const appStore = useAppStore()
 const siteName = computed(() => appStore.siteName || 'Sub2API')
 const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'Subscription to API Conversion Platform')
-const globalFooterHtml = computed(() => appStore.cachedPublicSettings?.global_footer_html || '')
 const settingsLoaded = computed(() => appStore.publicSettingsLoaded)
 
 const currentYear = computed(() => new Date().getFullYear())
