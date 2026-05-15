@@ -969,13 +969,14 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_RequiredWSV2_UsesSnapsh
 		"",
 		"session_hash_snapshot_ws",
 		"gpt-5.1",
-		nil,
-		OpenAIUpstreamTransportResponsesWebsocketV2,
-	)
-	require.NoError(t, err)
-	require.NotNil(t, selection)
-	require.NotNil(t, selection.Account)
-	require.Equal(t, int64(2401), selection.Account.ID)
+			nil,
+			OpenAIUpstreamTransportResponsesWebsocketV2,
+			false,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, selection)
+		require.NotNil(t, selection.Account)
+		require.Equal(t, int64(2401), selection.Account.ID)
 	require.Equal(t, "sk-live-snapshot", selection.Account.GetOpenAIApiKey())
 	require.Equal(t, "hydrated", selection.Account.Extra["full_only_field"])
 	require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
